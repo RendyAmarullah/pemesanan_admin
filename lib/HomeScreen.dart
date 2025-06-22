@@ -1,5 +1,6 @@
 
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/models.dart' as models;
@@ -61,14 +62,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _pickImage() async {
-    final ImagePicker _picker = ImagePicker();
-    final XFile? pickedFile =
-        await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (result != null) {
       setState(() {
-        _imageFile = File(pickedFile.path);
+        _imageFile = File(result.files.single.path!);
       });
-      _uploadImage();
+      await _uploadImage();
     }
   }
 
@@ -311,23 +310,39 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         children: [
          
-          UserAccountsDrawerHeader(
-            accountName: Text(_userName ?? 'Guest'),
-            accountEmail: Text(_userEmail ?? 'No email'),
-            currentAccountPicture: CircleAvatar(
+         UserAccountsDrawerHeader(
+  accountName: Text(_userName ?? 'Guest'),
+  accountEmail: Text(_userEmail ?? 'No email'),
+  currentAccountPicture: Stack(
+    children: [
+      CircleAvatar(
+        radius: 60,
+        child: _profileImageUrl != null
+            ? CircleAvatar(
                 radius: 60,
-                          child: _profileImageUrl != null
-                              ? CircleAvatar(
-                                  radius: 60,
-                                  backgroundImage:
-                                      NetworkImage(_profileImageUrl!))
-                              : const CircleAvatar(
-                                  radius: 60, child: Icon(Icons.person)),
-            ),
-            decoration: BoxDecoration(
-              color: Colors.blue,
-            ),
-          ),
+                backgroundImage: NetworkImage(_profileImageUrl!),
+              )
+            : const CircleAvatar(
+                radius: 60, child: Icon(Icons.person)),
+      ),
+      Positioned(
+        bottom: 0,
+        right: 0,
+        child: IconButton(
+          icon: Icon(Icons.camera_alt, color: Colors.white),
+          onPressed: () {
+           
+            _pickImage();
+          },
+        ),
+      ),
+    ],
+  ),
+  decoration: BoxDecoration(
+    color: Colors.blue,
+  ),
+),
+
          
           ListTile(
             leading: Icon(Icons.dashboard),
