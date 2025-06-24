@@ -270,10 +270,7 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Color(0xFF0072BC),
-        title: Text('Data Barang'),
-      ),
+      
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(

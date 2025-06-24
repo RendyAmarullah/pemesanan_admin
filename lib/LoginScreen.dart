@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/models.dart' as models;
+import 'package:pemesanan_web/main.dart';
 import 'HomeScreen.dart'; // Import HomeScreen
 
 class LoginScreen extends StatefulWidget {
@@ -76,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => HomeScreen(userId: user.$id),
+            builder: (context) => MainLayout(userId: user.$id),
           ),
         );
       } else {

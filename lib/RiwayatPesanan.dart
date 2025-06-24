@@ -29,8 +29,7 @@ class _RiwayatPesananState
 
   final String projectId = '681aa0b70002469fc157';
   final String databaseId = '681aa33a0023a8c7eb1f';
-  final String acceptedOrdersCollectionId = '6854b40600020e4a49aa';
-  final String rejectedOrdersCollectionId = '6854ba6e003bad3da579';
+  final String ordersCollectionId = '684b33e80033b767b024';
 
   @override
   void initState() {
@@ -57,26 +56,16 @@ class _RiwayatPesananState
     });
 
     try {
-      final acceptedResult = await _databases.listDocuments(
+      final ordersResult = await _databases.listDocuments(
         databaseId: databaseId,
-        collectionId: acceptedOrdersCollectionId,
+        collectionId: ordersCollectionId,
         queries: [
-          // Query.equal('userId', widget.userId),
-          // Query.orderDesc('\$createdAt'),
+          Query.equal('status', ['selesai']),
+          Query.orderDesc('\$createdAt'),
         ],
       );
 
-      final rejectedResult = await _databases.listDocuments(
-        databaseId: databaseId,
-        collectionId: rejectedOrdersCollectionId,
-        queries: [
-          // Query.equal('userId', widget.userId),
-          // Query.orderDesc('\$createdAt'),
-        ],
-      );
-
-      List<Map<String, dynamic>> acceptedOrders =
-          acceptedResult.documents.map((doc) {
+      List<Map<String, dynamic>> orders = ordersResult.documents.map((doc) {
         List<dynamic> products = [];
         try {
           if (doc.data['produk'] is String) {
@@ -96,54 +85,12 @@ class _RiwayatPesananState
           'metodePembayaran': doc.data['metodePembayaran'] ?? 'COD',
           'alamat': doc.data['alamat'] ?? 'No Address',
           'createdAt': doc.data['createdAt'] ?? '',
-          'status': 'sedang diproses', 
-          'isAccepted': true,
+          'status': doc.data['status'] ?? 'Menunggu',
         };
       }).toList();
-
-      List<Map<String, dynamic>> rejectedOrders =
-          rejectedResult.documents.map((doc) {
-        List<dynamic> products = [];
-        try {
-          if (doc.data['produk'] is String) {
-            products = jsonDecode(doc.data['produk']);
-          } else if (doc.data['produk'] is List) {
-            products = doc.data['produk'];
-          }
-        } catch (e) {
-          print('Error decoding products: $e');
-        }
-
-        return {
-          'orderId': doc.$id,
-          'originalOrderId': doc.data['orderId'] ?? doc.$id,
-          'produk': products,
-          'total': doc.data['total'] ?? 0,
-          'metodePembayaran': doc.data['metodePembayaran'] ?? 'COD',
-          'alamat': doc.data['alamat'] ?? 'No Address',
-          'createdAt': doc.data['createdAt'] ?? '',
-          'status': 'ditolak',
-          'isAccepted': false,
-        };
-      }).toList();
-
-     
-      List<Map<String, dynamic>> combinedOrders = [
-        ...acceptedOrders,
-        ...rejectedOrders
-      ];
-      combinedOrders.sort((a, b) {
-        try {
-          DateTime dateA = DateTime.parse(a['createdAt']);
-          DateTime dateB = DateTime.parse(b['createdAt']);
-          return dateB.compareTo(dateA);
-        } catch (e) {
-          return 0;
-        }
-      });
 
       setState(() {
-        _allOrders = combinedOrders;
+        _allOrders = orders;
         _isLoading = false;
       });
     } catch (e) {
@@ -152,6 +99,38 @@ class _RiwayatPesananState
         _errorMessage = 'Gagal memuat pesanan. Silakan coba lagi.';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _updateOrderStatus(String orderId, String newStatus) async {
+    try {
+      
+      await _databases.updateDocument(
+        databaseId: databaseId,
+        collectionId: ordersCollectionId,
+        documentId: orderId,
+        data: {'status': newStatus},
+      );
+
+      // Update local state to reflect the changes
+      setState(() {
+        _allOrders = _allOrders.map((order) {
+          if (order['orderId'] == orderId) {
+            order['status'] = newStatus;
+          }
+          return order;
+        }).toList();
+      });
+
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Status pesanan telah diperbarui menjadi $newStatus')),
+      );
+    } catch (e) {
+      print('Error updating order status: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memperbarui status pesanan')),
+      );
     }
   }
 
@@ -174,7 +153,6 @@ class _RiwayatPesananState
 
   Widget _buildOrderCard(Map<String, dynamic> order) {
     List<dynamic> products = order['produk'];
-    bool isAccepted = order['isAccepted'] ?? false;
     String status = order['status'] ?? 'unknown';
 
     return Container(
@@ -195,7 +173,6 @@ class _RiwayatPesananState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header dengan Order ID dan Status
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -213,13 +190,13 @@ class _RiwayatPesananState
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: isAccepted ? Colors.green[100] : Colors.red[100],
+                    color: status == 'Sedang Diantar' ? Colors.green[100] : Colors.orange[100],
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    isAccepted ? 'Sedang Diproses' : 'Ditolak',
+                    status,
                     style: TextStyle(
-                      color: isAccepted ? Colors.green[800] : Colors.red[800],
+                      color: status == 'Sedang Diantar' ? Colors.green[800] : Colors.orange[800],
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -292,7 +269,6 @@ class _RiwayatPesananState
             ),
             SizedBox(height: 12),
 
-            // Total, COD, dan Tanggal
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -336,43 +312,33 @@ class _RiwayatPesananState
                 ),
               ],
             ),
+
+            
+            if (status == 'sedang diproses')
+              SizedBox(
+                height: 16,
+                child: ElevatedButton(
+                  onPressed: () => _updateOrderStatus(order['orderId'], 'Sedang Diantar'),
+                  child: Text('Sedang Diantar'),
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white, backgroundColor: Colors.blue,
+                  ),
+                ),
+              ),
+            if (status == 'Sedang Diantar')
+              SizedBox(
+                height: 16,
+                child: ElevatedButton(
+                  onPressed: () => _updateOrderStatus(order['orderId'], 'Pesanan Telah Diterima'),
+                  child: Text('Pesanan Telah Diterima'),
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white, backgroundColor: Colors.green,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildOrderList() {
-    if (_allOrders.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.assignment_outlined,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Tidak ada pesanan',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: EdgeInsets.all(16),
-      itemCount: _allOrders.length,
-      itemBuilder: (context, index) {
-        return _buildOrderCard(_allOrders[index]);
-      },
     );
   }
 
@@ -380,24 +346,7 @@ class _RiwayatPesananState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Color(0xFF0072BC),
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(20),
-            bottomRight: Radius.circular(20),
-          ),
-        ),
-        title: Text(
-          'Status Pesanan',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-      ),
+      
       body: _isLoading
           ? Center(
               child: Column(
@@ -431,7 +380,13 @@ class _RiwayatPesananState
                 )
               : RefreshIndicator(
                   onRefresh: _fetchOrders,
-                  child: _buildOrderList(),
+                  child: ListView.builder(
+                    padding: EdgeInsets.all(16),
+                    itemCount: _allOrders.length,
+                    itemBuilder: (context, index) {
+                      return _buildOrderCard(_allOrders[index]);
+                    },
+                  ),
                 ),
     );
   }

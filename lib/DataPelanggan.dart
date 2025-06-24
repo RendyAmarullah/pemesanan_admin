@@ -145,22 +145,7 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Color(0xFF0072BC),
-        title: Text('Data Pelanggan'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Icon(Icons.account_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Admin', style: TextStyle(color: Colors.white)),
-              ],
-            ),
-          ),
-        ],
-      ),
+      
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
