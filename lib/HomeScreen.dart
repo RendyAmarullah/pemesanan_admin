@@ -7,6 +7,7 @@ import 'package:appwrite/models.dart' as models;
 import 'package:image_picker/image_picker.dart';
 import 'package:pemesanan_web/DataBarangScreen.dart';
 import 'package:pemesanan_web/DataPelanggan.dart';
+import 'package:pemesanan_web/LoginScreen.dart';
 import 'package:pemesanan_web/RiwayatPesanan.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -70,6 +71,20 @@ class _HomeScreenState extends State<HomeScreen> {
       await _uploadImage();
     }
   }
+
+   Future<void> _logout() async {
+    try {
+      await _account.deleteSession(sessionId: 'current');
+      
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => LoginScreen()),
+      );
+    } catch (e) {
+      print('Logout failed: $e');
+    }
+  }
+
 
   Future<void> _loadProfileData() async {
     setState(() {
@@ -289,14 +304,31 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.blue,
         actions: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: IconButton(
-              icon: Icon(Icons.exit_to_app),
-              onPressed: () {
-              
-              },
-            ),
-          )
+  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+  child: IconButton(
+    icon: Icon(Icons.exit_to_app),
+    onPressed: () async {
+     
+      try {
+        
+        await account?.deleteSession(sessionId: 'current');
+        
+        
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+        );
+      } catch (e) {
+        print('Logout failed: $e');
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to logout, try again.')),
+        );
+      }
+    },
+  ),
+)
+
         ],
       ),
       drawer: _buildDrawer(),
@@ -354,6 +386,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.pop(context); 
             },
           ),
+           
           ListTile(
             leading: Icon(Icons.people),
             title: Text('Data Pelanggan'),

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 
 final client = Client()
-  ..setEndpoint('https://fra.cloud.appwrite.io/v1') 
+  ..setEndpoint('https://fra.cloud.appwrite.io/v1')
   ..setProject('681aa0b70002469fc157')
   ..setSelfSigned(status: true);
 
@@ -22,8 +22,8 @@ class _RiwayatPesananState
   late Client _client;
   late Databases _databases;
   late Account _account;
-  List<Map<String, dynamic>> _acceptedOrders = [];
-  List<Map<String, dynamic>> _rejectedOrders = [];
+
+  List<Map<String, dynamic>> _allOrders = [];
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -50,76 +50,100 @@ class _RiwayatPesananState
     _account = Account(_client);
   }
 
- Future<void> _fetchOrders() async {
+  Future<void> _fetchOrders() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      // Memuat pesanan yang diterima
       final acceptedResult = await _databases.listDocuments(
         databaseId: databaseId,
         collectionId: acceptedOrdersCollectionId,
-       
+        queries: [
+          // Query.equal('userId', widget.userId),
+          // Query.orderDesc('\$createdAt'),
+        ],
       );
 
-      // Memuat pesanan yang ditolak
       final rejectedResult = await _databases.listDocuments(
         databaseId: databaseId,
         collectionId: rejectedOrdersCollectionId,
-        
+        queries: [
+          // Query.equal('userId', widget.userId),
+          // Query.orderDesc('\$createdAt'),
+        ],
       );
 
+      List<Map<String, dynamic>> acceptedOrders =
+          acceptedResult.documents.map((doc) {
+        List<dynamic> products = [];
+        try {
+          if (doc.data['produk'] is String) {
+            products = jsonDecode(doc.data['produk']);
+          } else if (doc.data['produk'] is List) {
+            products = doc.data['produk'];
+          }
+        } catch (e) {
+          print('Error decoding products: $e');
+        }
+
+        return {
+          'orderId': doc.$id,
+          'originalOrderId': doc.data['orderId'] ?? doc.$id,
+          'produk': products,
+          'total': doc.data['total'] ?? 0,
+          'metodePembayaran': doc.data['metodePembayaran'] ?? 'COD',
+          'alamat': doc.data['alamat'] ?? 'No Address',
+          'createdAt': doc.data['createdAt'] ?? '',
+          'status': 'sedang diproses', 
+          'isAccepted': true,
+        };
+      }).toList();
+
+      List<Map<String, dynamic>> rejectedOrders =
+          rejectedResult.documents.map((doc) {
+        List<dynamic> products = [];
+        try {
+          if (doc.data['produk'] is String) {
+            products = jsonDecode(doc.data['produk']);
+          } else if (doc.data['produk'] is List) {
+            products = doc.data['produk'];
+          }
+        } catch (e) {
+          print('Error decoding products: $e');
+        }
+
+        return {
+          'orderId': doc.$id,
+          'originalOrderId': doc.data['orderId'] ?? doc.$id,
+          'produk': products,
+          'total': doc.data['total'] ?? 0,
+          'metodePembayaran': doc.data['metodePembayaran'] ?? 'COD',
+          'alamat': doc.data['alamat'] ?? 'No Address',
+          'createdAt': doc.data['createdAt'] ?? '',
+          'status': 'ditolak',
+          'isAccepted': false,
+        };
+      }).toList();
+
+     
+      List<Map<String, dynamic>> combinedOrders = [
+        ...acceptedOrders,
+        ...rejectedOrders
+      ];
+      combinedOrders.sort((a, b) {
+        try {
+          DateTime dateA = DateTime.parse(a['createdAt']);
+          DateTime dateB = DateTime.parse(b['createdAt']);
+          return dateB.compareTo(dateA);
+        } catch (e) {
+          return 0;
+        }
+      });
+
       setState(() {
-        // Memasukkan pesanan yang diterima
-        _acceptedOrders = acceptedResult.documents.map((doc) {
-          List<dynamic> products = [];
-          try {
-            if (doc.data['produk'] is String) {
-              products = jsonDecode(doc.data['produk']);
-            } else if (doc.data['produk'] is List) {
-              products = doc.data['produk'];
-            }
-          } catch (e) {
-            print('Error decoding products: $e');
-          }
-
-          return {
-            'orderId': doc.$id,
-            'produk': products,
-            'total': doc.data['total'] ?? 0,
-            'metodePembayaran': doc.data['metodePembayaran'] ?? 'Unknown',
-            'alamat': doc.data['alamat'] ?? 'No Address',
-            'createdAt': doc.data['createdAt'] ?? '',
-            'status': doc.data['status'] ?? 'Unknown',
-          };
-        }).toList();
-
-        // Memasukkan pesanan yang ditolak
-        _rejectedOrders = rejectedResult.documents.map((doc) {
-          List<dynamic> products = [];
-          try {
-            if (doc.data['produk'] is String) {
-              products = jsonDecode(doc.data['produk']);
-            } else if (doc.data['produk'] is List) {
-              products = doc.data['produk'];
-            }
-          } catch (e) {
-            print('Error decoding products: $e');
-          }
-
-          return {
-            'orderId': doc.$id,
-            'produk': products,
-            'total': doc.data['total'] ?? 0,
-            'metodePembayaran': doc.data['metodePembayaran'] ?? 'Unknown',
-            'alamat': doc.data['alamat'] ?? 'No Address',
-            'createdAt': doc.data['createdAt'] ?? '',
-            'status': doc.data['status'] ?? 'Unknown',
-          };
-        }).toList();
-
+        _allOrders = combinedOrders;
         _isLoading = false;
       });
     } catch (e) {
@@ -130,7 +154,6 @@ class _RiwayatPesananState
       });
     }
   }
-
 
   String _formatCurrency(int amount) {
     return 'Rp ${amount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
@@ -145,141 +168,271 @@ class _RiwayatPesananState
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: Size.fromHeight(60),
-        child: AppBar(
-          backgroundColor: Color(0xFF0072BC),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(20),
-              bottomRight: Radius.circular(20),
-            ),
-          ),
-          title: Text(
-            'Pesanan Diterima dan Ditolak',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-            ),
-          ),
-          
-        ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: _fetchOrders,
-        child: _buildBody(),
-      ),
-    );
+  String _formatOrderId(String orderId) {
+    return '#${orderId.substring(0, 10)}';
   }
 
-  Widget _buildBody() {
-    if (_isLoading) {
-      return Center(
+  Widget _buildOrderCard(Map<String, dynamic> order) {
+    List<dynamic> products = order['produk'];
+    bool isAccepted = order['isAccepted'] ?? false;
+    String status = order['status'] ?? 'unknown';
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Memuat pesanan diterima dan ditolak...'),
-          ],
-        ),
-      );
-    }
-
-    if (_errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red),
-            SizedBox(height: 16),
-            Text(
-              _errorMessage!,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16),
+            // Header dengan Order ID dan Status
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _formatOrderId(order['originalOrderId']),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isAccepted ? Colors.green[100] : Colors.red[100],
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    isAccepted ? 'Sedang Diproses' : 'Ditolak',
+                    style: TextStyle(
+                      color: isAccepted ? Colors.green[800] : Colors.red[800],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _fetchOrders,
-              child: Text('Coba Lagi'),
+            SizedBox(height: 12),
+
+            // Alamat
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.location_on_outlined,
+                  size: 16,
+                  color: Colors.grey[600],
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Alamat: ${order['alamat']}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      );
-    }
+            SizedBox(height: 8),
 
-    return ListView(
-      children: [
-        // Pesanan Diterima
-        _buildOrderSection('Pesanan Diterima', _acceptedOrders),
-
-        // Pesanan Ditolak
-        _buildOrderSection('Pesanan Ditolak', _rejectedOrders),
-      ],
-    );
-  }
-
- Widget _buildOrderSection(String title, List<Map<String, dynamic>> orders) {
-  if (orders.isEmpty) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Text(
-        '$title: Tidak ada pesanan.',
-        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-      ),
-    );
-  }
-
-  return Padding(
-    padding: const EdgeInsets.all(16.0),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        SizedBox(height: 10),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
-          itemCount: orders.length,
-          itemBuilder: (context, index) {
-            var order = orders[index];
-            List<dynamic> products = order['produk'];
-
-            return Card(
-                margin: EdgeInsets.symmetric(vertical: 10),
-                child: ListTile(
-                  contentPadding: EdgeInsets.all(10),
-                  title: Column(
+            // Produk
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.shopping_bag_outlined,
+                  size: 16,
+                  color: Colors.grey[600],
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Order ID: ${order['orderId']}'),
-                      Text('Alamat: ${order['alamat']}'),
-                      Text('Metode Pembayaran: ${order['metodePembayaran']}'),
-                      Text('Total: ${_formatCurrency(order['total'])}'),
-                      SizedBox(height: 10),
-                      Text('Produk:'),
-                      ...products.map((product) {
-                        return Text('Nama: ${product['nama']}, Jumlah: ${product['jumlah']}');
-                      }).toList(),
+                      Text(
+                        'Order:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      ...products
+                          .map((product) => Padding(
+                                padding: EdgeInsets.only(left: 8, top: 4),
+                                child: Text(
+                                  '• ${product['nama']} (${product['jumlah']}x)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ))
+                          .toList(),
                     ],
                   ),
                 ),
-              );
-          },
+              ],
+            ),
+            SizedBox(height: 12),
+
+            // Total, COD, dan Tanggal
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        order['metodePembayaran'].toUpperCase(),
+                        style: TextStyle(
+                          color: Colors.blue[700],
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      _formatDate(order['createdAt']),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  _formatCurrency(order['total']),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-      ],
-    ),
-  );
- }
+      ),
+    );
+  }
+
+  Widget _buildOrderList() {
+    if (_allOrders.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.assignment_outlined,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Tidak ada pesanan',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
     }
+
+    return ListView.builder(
+      padding: EdgeInsets.all(16),
+      itemCount: _allOrders.length,
+      itemBuilder: (context, index) {
+        return _buildOrderCard(_allOrders[index]);
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        backgroundColor: Color(0xFF0072BC),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          ),
+        ),
+        title: Text(
+          'Status Pesanan',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+      ),
+      body: _isLoading
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Memuat status pesanan...'),
+                ],
+              ),
+            )
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      SizedBox(height: 16),
+                      Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16),
+                      ),
+                      SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _fetchOrders,
+                        child: Text('Coba Lagi'),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _fetchOrders,
+                  child: _buildOrderList(),
+                ),
+    );
+  }
+}

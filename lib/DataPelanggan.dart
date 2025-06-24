@@ -25,7 +25,6 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
   void initState() {
     super.initState();
 
-    
     client = Client();
     client.setEndpoint('https://cloud.appwrite.io/v1').setProject(projectId);
     databases = Databases(client);
@@ -34,7 +33,6 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
     _loadPelangganData();
   }
 
- 
   Future<void> _loadPelangganData() async {
     try {
       final response = await databases.listDocuments(
@@ -58,8 +56,6 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
         }).toList();
 
         filteredCustomers = List.from(customers);
-
-       
         _fetchCustomerAddresses();
       });
     } catch (e) {
@@ -67,7 +63,6 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
     }
   }
 
-  
   Future<void> _fetchCustomerAddresses() async {
     for (var i = 0; i < customers.length; i++) {
       try {
@@ -80,7 +75,6 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
         );
 
         if (response.documents.isNotEmpty) {
-          
           setState(() {
             customers[i]['alamat'] = response.documents.first.data['address'] ?? 'Alamat tidak tersedia';
           });
@@ -89,13 +83,12 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
         print('Error fetching address: $e');
       }
     }
-   
+
     setState(() {
       filteredCustomers = List.from(customers);
     });
   }
 
- 
   void _filterData() {
     setState(() {
       filteredCustomers = customers
@@ -117,6 +110,36 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
                   .contains(searchController.text.toLowerCase()))
           .toList();
     });
+  }
+
+  // Fungsi untuk update status pelanggan
+  Future<void> _updateStatus(String userId, String newStatus) async {
+    try {
+      await databases.updateDocument(
+        databaseId: databaseId,
+        collectionId: usersCollectionId,
+        documentId: userId,
+        data: {'status': newStatus},
+      );
+
+      setState(() {
+        filteredCustomers = filteredCustomers.map((customer) {
+          if (customer['userId'] == userId) {
+            customer['status'] = newStatus;
+          }
+          return customer;
+        }).toList();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Status berhasil diperbarui')),
+      );
+    } catch (e) {
+      print('Error updating status: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memperbarui status')),
+      );
+    }
   }
 
   @override
@@ -164,18 +187,18 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
                   scrollDirection: Axis.vertical,
                   child: Container(
                     padding: const EdgeInsets.all(4.0),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.black, width: 1.0),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.black, width: 1.0),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                     child: DataTable(
-                      
                       columns: [
                         DataColumn(label: Text('Username')),
                         DataColumn(label: Text('Email')),
                         DataColumn(label: Text('Alamat')),
                         DataColumn(label: Text('No. Handphone')),
                         DataColumn(label: Text('Status')),
+                        DataColumn(label: Text('Actions')),
                       ],
                       rows: filteredCustomers.map((customer) {
                         return DataRow(cells: [
@@ -184,6 +207,28 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
                           DataCell(Text(customer['alamat']!)),
                           DataCell(Text(customer['noHandphone']!)),
                           DataCell(Text(customer['status']!)),
+                          DataCell(
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: Icon(
+                                    customer['status'] == 'Aktif'
+                                        ? Icons.lock
+                                        : Icons.lock_open,
+                                    color: customer['status'] == 'Aktif'
+                                        ? Colors.red
+                                        : Colors.green,
+                                  ),
+                                  onPressed: () {
+                                    String newStatus = customer['status'] == 'Aktif'
+                                        ? 'Nonaktif'
+                                        : 'Aktif';
+                                    _updateStatus(customer['userId'], newStatus);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
                         ]);
                       }).toList(),
                     ),
