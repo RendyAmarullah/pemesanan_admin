@@ -1,8 +1,11 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:pemesanan_web/LoginScreen.dart';
 import 'package:pemesanan_web/DataBarangScreen.dart';
 import 'package:pemesanan_web/DataPelanggan.dart';
 import 'package:pemesanan_web/RiwayatPesanan.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/models.dart' as models;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -116,23 +119,36 @@ class _MainLayoutState extends State<MainLayout> {
   int _totalBarang = 0;
   int _totalPenjualan = 0;
   double _totalPendapatan = 0;
-
-  
   final String userCollectionId = '681aa352000e7e9b76b5';
   final String projectId = '681aa0b70002469fc157';
   final String databaseId = '681aa33a0023a8c7eb1f';
   final String bucketId = '681aa16f003054da8969';
   final String usersCollectionId = '684083800031dfaaecad';
   final String productKoleksiId = '68407bab00235ecda20d';
-
-
+  int _selectedYear = DateTime.now().year; 
+  Map<int, int> _penjualanPerBulan = {};
+   Map<int, double> _pendapatanPerBulan = {};
   late Client _client;
   late Storage _storage;
   late Account _account;
   late Databases _databases;
   models.Session? _session;
   models.User? _currentUser;
+  bool _showSalesChart = true;
 
+  final List<String> _monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+    'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+  ];
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    await Future.wait([
+      _ambilPenjualan(_selectedYear),
+      _ambilPendapatan(_selectedYear),
+    ]);
+    setState(() => _isLoading = false);
+  }
   @override
   void initState() {
     super.initState();
@@ -140,8 +156,8 @@ class _MainLayoutState extends State<MainLayout> {
     _loadProfileData();
     _fetchCustomerCount();
     _ambilTotalBarang();
-    _ambilPenjualan();
-    _ambilPendapatan();
+    _ambilPenjualan(2025);
+    _ambilPendapatan(2025);
   }
 
   void _initializeAppwrite() {
@@ -155,14 +171,12 @@ class _MainLayoutState extends State<MainLayout> {
     _account = Account(_client);
     _databases = Databases(_client);
   }
-
   Future<void> _loadProfileData() async {
     if (!mounted) return;
 
     setState(() {
       _isLoading = true;
     });
-
     try {
       _session = await _account.getSession(sessionId: 'current');
       _currentUser = await _account.get();
@@ -175,17 +189,14 @@ class _MainLayoutState extends State<MainLayout> {
           _userName = _currentUser!.name;
         }
       });
-
       final userId = _currentUser?.$id;
       if (userId != null) {
-        
         try {
           final profileDoc = await _databases.getDocument(
             databaseId: databaseId,
             collectionId: userCollectionId,
             documentId: userId,
           );
-
           final profileImageId = profileDoc.data['profile_image'];
           if (profileImageId != null && mounted) {
             final fileViewUrl =
@@ -204,8 +215,6 @@ class _MainLayoutState extends State<MainLayout> {
             );
           }
         }
-
-        
         try {
           final userNameDoc = await _databases.getDocument(
             databaseId: databaseId,
@@ -228,7 +237,6 @@ class _MainLayoutState extends State<MainLayout> {
               'email': _currentUser?.email ?? '',
               'userId': userId,
             };
-
             await _databases.createDocument(
               databaseId: databaseId,
               collectionId: usersCollectionId,
@@ -244,7 +252,6 @@ class _MainLayoutState extends State<MainLayout> {
           }
         }
       }
-
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -259,28 +266,67 @@ class _MainLayoutState extends State<MainLayout> {
       }
     }
   }
-
-  Future<void> _ambilPendapatan() async {
+Future<void> _ambilPenjualan(int tahun) async {
     setState(() {
       _isLoading = true;
+      _penjualanPerBulan.clear(); 
+    });
+    try {
+      int totalPenjualan = 0;
+      for (int bulan = 1; bulan <= 12; bulan++) {
+        final result = await _databases.listDocuments(
+          databaseId: databaseId,
+          collectionId: '684b33e80033b767b024',
+          queries: [
+            // Query.equal('status', 'selesai'),
+            Query.greaterThanEqual('tanggal', DateTime(tahun, bulan, 1).toIso8601String()),
+            Query.lessThan('tanggal', DateTime(tahun, bulan + 1, 1).toIso8601String()), 
+          ],
+        );
+        int jumlahPenjualan = result.documents.length;
+        totalPenjualan += jumlahPenjualan;
+        _penjualanPerBulan[bulan] = jumlahPenjualan;
+      }
+
+      setState(() {
+        _totalPenjualan = totalPenjualan;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching penjualan per tahun: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+  Future<void> _ambilPendapatan(int tahun) async {
+    
+    setState(() {
+      _isLoading = true;
+      
     });
 
     try {
-     
+     double totalpendapatan = 0;
+      for(int bulan = 1; bulan <= 12; bulan++){
       final result = await _databases.listDocuments(
         databaseId: databaseId,
         collectionId: '684b33e80033b767b024',
         queries: [
           Query.equal('status', 'selesai'),
+          Query.greaterThanEqual('tanggal', DateTime(tahun, bulan, 1).toIso8601String()),
+          Query.lessThan('tanggal', DateTime(tahun, bulan + 1, 1).toIso8601String()), 
         ],
       );
-
+      
       double totalRevenue = 0;
        for (var doc in result.documents) {
-      totalRevenue += doc.data['total'] ?? 0.0; // Ensure that the 'total' field exists
+      totalpendapatan += doc.data['total'] ?? 0.0;
     }
+      }
+
       setState(() {
-        _totalPendapatan = totalRevenue;
+        _totalPendapatan = totalpendapatan;
         _isLoading = false;
       });
     } catch (e) {
@@ -317,34 +363,7 @@ class _MainLayoutState extends State<MainLayout> {
       });
     }
   }
-
-  Future<void> _ambilPenjualan() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-     
-      final result = await _databases.listDocuments(
-        databaseId: databaseId,
-        collectionId: '684b33e80033b767b024',
-        queries: [
-          Query.equal('status', 'selesai'),
-        ],
-      );
-
-      setState(() {
-        _totalPenjualan = result.documents.length;
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error fetching penjualan count: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
+  
   Future<void> _fetchCustomerCount() async {
     setState(() {
       _isLoading = true;
@@ -432,6 +451,144 @@ class _MainLayoutState extends State<MainLayout> {
         }
       }
     }
+  }
+
+  Widget _buildSalesBarChart() {
+  List<BarChartGroupData> barGroups = List.generate(12, (index) {
+    int month = index + 1;
+    return BarChartGroupData(
+      x: month,
+      barRods: [
+        BarChartRodData(
+          toY: (_penjualanPerBulan[month] ?? 0).toDouble(),
+          color: Colors.blue,
+          width: 20,
+          borderRadius: BorderRadius.circular(4),
+        ),
+      ],
+    );
+  });
+
+  return BarChart(
+    BarChartData(
+      alignment: BarChartAlignment.spaceAround,
+      maxY: (_penjualanPerBulan.values.isEmpty ? 10 : 
+             _penjualanPerBulan.values.reduce((a, b) => a > b ? a : b).toDouble()) * 1.2,
+      barTouchData: BarTouchData(
+        touchTooltipData: BarTouchTooltipData(
+          tooltipBgColor: Colors.blueGrey,
+          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+            String monthName = _monthNames[group.x.toInt() - 1];
+            return BarTooltipItem(
+              '$monthName\n${rod.toY.round()}',
+              TextStyle(color: Colors.white),
+            );
+          },
+        ),
+      ),
+      titlesData: FlTitlesData(
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+        ),
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            getTitlesWidget: (value, meta) {
+              int index = value.toInt() - 1;
+              if (index >= 0 && index < _monthNames.length) {
+                return Text(_monthNames[index], style: TextStyle(fontSize: 12));
+              }
+              return Text('');
+            },
+          ),
+        ),
+        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      ),
+      borderData: FlBorderData(show: false),
+      barGroups: barGroups,
+    ),
+  );
+}
+
+// Method untuk build revenue line chart
+Widget _buildRevenueLineChart() {
+  List<FlSpot> spots = List.generate(12, (index) {
+    int month = index + 1;
+    return FlSpot(month.toDouble(), _pendapatanPerBulan[month] ?? 0);
+  });
+
+  return LineChart(
+    LineChartData(
+      gridData: FlGridData(show: true, drawVerticalLine: false),
+      titlesData: FlTitlesData(
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 60,
+            getTitlesWidget: (value, meta) {
+              return Text(_formatCurrency(value), style: TextStyle(fontSize: 10));
+            },
+          ),
+        ),
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            getTitlesWidget: (value, meta) {
+              int index = value.toInt() - 1;
+              if (index >= 0 && index < _monthNames.length) {
+                return Text(_monthNames[index], style: TextStyle(fontSize: 12));
+              }
+              return Text('');
+            },
+          ),
+        ),
+        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      ),
+      borderData: FlBorderData(show: true),
+      minX: 1,
+      maxX: 12,
+      minY: 0,
+      lineBarsData: [
+        LineChartBarData(
+          spots: spots,
+          isCurved: true,
+          color: Colors.green,
+          barWidth: 3,
+          dotData: FlDotData(show: true),
+          belowBarData: BarAreaData(
+            show: true,
+            color: Colors.green.withOpacity(0.1),
+          ),
+        ),
+      ],
+      lineTouchData: LineTouchData(
+        touchTooltipData: LineTouchTooltipData(
+          tooltipBgColor: Colors.green,
+          getTooltipItems: (touchedSpots) {
+            return touchedSpots.map((touchedSpot) {
+              int monthIndex = touchedSpot.x.toInt() - 1;
+              String monthName = _monthNames[monthIndex];
+              return LineTooltipItem(
+                '$monthName\nRp ${_formatCurrency(touchedSpot.y)}',
+                TextStyle(color: Colors.white),
+              );
+            }).toList();
+          },
+        ),
+      ),
+    ),
+  );
+}
+
+  String _formatCurrency(double amount) {
+    if (amount >= 1000000) {
+      return '${(amount / 1000000).toStringAsFixed(1)}M';
+    } else if (amount >= 1000) {
+      return '${(amount / 1000).toStringAsFixed(1)}K';
+    }
+    return amount.toStringAsFixed(0);
   }
 
   void _logout() async {
@@ -541,8 +698,8 @@ class _MainLayoutState extends State<MainLayout> {
                     ],
                   ),
                 ),
+                
 
-                // Navigation Menu
                 Expanded(
                   child: Container(
                     padding: EdgeInsets.symmetric(vertical: 10),
@@ -592,7 +749,7 @@ class _MainLayoutState extends State<MainLayout> {
                     ),
                   ),
                 ),
-
+                
                 // Logout Button
                 Container(
                   padding: EdgeInsets.all(20),
@@ -674,6 +831,7 @@ class _MainLayoutState extends State<MainLayout> {
                   ),
                 ),
 
+               
                 // Page Content
                 Expanded(
                   child: Container(
@@ -686,8 +844,11 @@ class _MainLayoutState extends State<MainLayout> {
           ),
         ],
       ),
+      
     );
   }
+
+  
 
   Widget _buildMenuTile({
     required IconData icon,
@@ -750,14 +911,14 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
 @override
-  Widget _buildDashboardContent() {
-    return Scaffold(
-      
-      body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(),
-            )
-          : Padding(
+Widget _buildDashboardContent() {
+  return Scaffold(
+    body: _isLoading
+        ? Center(
+            child: CircularProgressIndicator(),
+          )
+        : SingleChildScrollView(  // Ensure scroll is working
+            child: Padding(
               padding: EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -818,9 +979,7 @@ class _MainLayoutState extends State<MainLayout> {
                       ],
                     ),
                   ),
-
                   SizedBox(height: 32),
-
                   // Stats Cards
                   Text(
                     'Ringkasan',
@@ -830,12 +989,68 @@ class _MainLayoutState extends State<MainLayout> {
                       color: Colors.grey[800],
                     ),
                   ),
-
                   SizedBox(height: 16),
+                   // Year Selector
+    Card(
+      margin: EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Tahun: $_selectedYear',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+            Row(
+              children: [
+                IconButton(
+                  icon: Icon(Icons.chevron_left),
+                  onPressed: () {
+                    setState(() => _selectedYear--);
+                    _loadData();
+                  },
+                ),
+                IconButton(
+                  icon: Icon(Icons.chevron_right),
+                  onPressed: () {
+                    setState(() => _selectedYear++);
+                    _loadData();
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
 
+                  // Input tahun
+                  TextField(
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedYear = int.tryParse(value) ?? DateTime.now().year;
+                      });
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Masukkan Tahun',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                  SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      _ambilPenjualan(_selectedYear);
+                    },
+                    child: Text('Pilih Tahun'),
+                  ),
+                   SizedBox(height: 16),
                   Row(
                     children: [
+                      // Remove Expanded widget here
                       Expanded(
+                       
                         child: _buildStatsCard(
                           title: 'Total Pelanggan',
                           value: '$_totalCustomers',
@@ -853,51 +1068,173 @@ class _MainLayoutState extends State<MainLayout> {
                         ),
                       ),
                       SizedBox(width: 16),
-                      Expanded(
-                        child: _buildStatsCard(
-                          title: 'Penjualan',
-                          value: '$_totalPenjualan',
-                          icon: Icons.shopping_cart,
-                          color: Colors.orange,
+                      if (_isLoading)
+                      CircularProgressIndicator(),
+                      if (!_isLoading) ...[
+                        Expanded(
+                          child: _buildStatsCard(
+                            title: 'Penjualan',
+                            value: '$_totalPenjualan',
+                            icon: Icons.shopping_cart,
+                            color: Colors.orange,
+                          ),
                         ),
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: _buildStatsCard(
-                          title: 'Total Pendapatan',
-                          value: 'RP $_totalPendapatan',
-                          icon: Icons.attach_money,
-                          color: Colors.purple,
+                        SizedBox(height: 16),
+                        Expanded(
+                          child: _buildStatsCard(
+                            title: 'Total Pendapatan',
+                            value: 'RP $_totalPendapatan',
+                            icon: Icons.attach_money,
+                            color: Colors.purple,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
-
                   SizedBox(height: 32),
-
+                  SizedBox(height: 32),
                   // Recent Activity
-                  Expanded(
-                    child: Container(
-                      padding: EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            spreadRadius: 1,
-                            blurRadius: 10,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
+                  Container(
+                    padding: EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          spreadRadius: 1,
+                          blurRadius: 10,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
                     ),
+                  child: Column(
+                    
+                    children: [
+   
+    // Chart Type Toggle
+    Card(
+      margin: EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => setState(() => _showSalesChart = true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _showSalesChart ? Colors.blue : Colors.grey[300],
+                  foregroundColor: _showSalesChart ? Colors.white : Colors.black,
+                ),
+                child: Text('Penjualan'),
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => setState(() => _showSalesChart = false),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: !_showSalesChart ? Colors.green : Colors.grey[300],
+                  foregroundColor: !_showSalesChart ? Colors.white : Colors.black,
+                ),
+                child: Text('Pendapatan'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+
+    // Summary Cards
+    Row(
+      children: [
+        Expanded(
+          child: Card(
+            color: Colors.blue[50],
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Icon(Icons.shopping_cart, size: 32, color: Colors.blue),
+                  SizedBox(height: 8),
+                  Text(
+                    'Total Penjualan',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                  Text(
+                    '$_totalPenjualan',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
             ),
-    );
-  }
+          ),
+        ),
+        SizedBox(width: 16),
+        Expanded(
+          child: Card(
+            color: Colors.green[50],
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Icon(Icons.attach_money, size: 32, color: Colors.green),
+                  SizedBox(height: 8),
+                  Text(
+                    'Total Pendapatan',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                  Text(
+                    'Rp ${_formatCurrency(_totalPendapatan)}',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+
+    SizedBox(height: 16),
+
+    // Main Chart
+    Card(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _showSalesChart ? 'Grafik Penjualan per Bulan' : 'Grafik Pendapatan per Bulan',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 16),
+            Container(
+              height: 300,
+              child: _isLoading
+                  ? Center(child: CircularProgressIndicator())
+                  : _showSalesChart
+                      ? _buildSalesBarChart()
+                      : _buildRevenueLineChart(),
+            ),
+          ],
+        ),
+      ),
+    ),
+  ],
+                  ),
+                
+                  ),
+                ],
+              ),
+            ),
+          ),
+  );
+}
+
+
+
 
   Widget _buildStatsCard({
     required String title,
