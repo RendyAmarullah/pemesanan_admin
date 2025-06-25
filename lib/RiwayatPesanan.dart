@@ -60,7 +60,7 @@ class _RiwayatPesananState
         databaseId: databaseId,
         collectionId: ordersCollectionId,
         queries: [
-          Query.equal('status', ['selesai']),
+          Query.equal('status', ['selesai', 'dibatalkan']),
           Query.orderDesc('\$createdAt'),
         ],
       );
@@ -79,8 +79,9 @@ class _RiwayatPesananState
 
         return {
           'orderId': doc.$id,
-          'originalOrderId': doc.data['orderId'] ?? doc.$id,
+          'originalOrderId': doc.data['orderId'],
           'produk': products,
+          'nama' : doc.data['nama'],
           'total': doc.data['total'] ?? 0,
           'metodePembayaran': doc.data['metodePembayaran'] ?? 'COD',
           'alamat': doc.data['alamat'] ?? 'No Address',
@@ -177,7 +178,7 @@ class _RiwayatPesananState
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  _formatOrderId(order['originalOrderId']),
+                  order['originalOrderId'],
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -205,7 +206,27 @@ class _RiwayatPesananState
               ],
             ),
             SizedBox(height: 12),
-
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.person,
+                  size: 16,
+                  color: Colors.grey[600],
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Nama: ${order['nama']}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
             // Alamat
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
