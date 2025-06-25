@@ -989,9 +989,30 @@ Widget _buildDashboardContent() {
                       color: Colors.grey[800],
                     ),
                   ),
-                  SizedBox(height: 16),
-                   // Year Selector
-    Card(
+                   SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatsCard(
+                          title: 'Total Pelanggan',
+                          value: '$_totalCustomers',
+                          icon: Icons.people,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: _buildStatsCard(
+                          title: 'Total Barang',
+                          value: '$_totalBarang',
+                          icon: Icons.inventory,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 16,),
+                      Card(
       margin: EdgeInsets.only(bottom: 16),
       child: Padding(
         padding: EdgeInsets.all(16),
@@ -1024,8 +1045,8 @@ Widget _buildDashboardContent() {
         ),
       ),
     ),
-
-                  // Input tahun
+                  SizedBox(height: 5),
+                   // Input tahun
                   TextField(
                     onChanged: (value) {
                       setState(() {
@@ -1038,61 +1059,14 @@ Widget _buildDashboardContent() {
                     ),
                     keyboardType: TextInputType.number,
                   ),
-                  SizedBox(height: 16),
+                  SizedBox(height: 12),
                   ElevatedButton(
                     onPressed: () {
                       _ambilPenjualan(_selectedYear);
                     },
                     child: Text('Pilih Tahun'),
                   ),
-                   SizedBox(height: 16),
-                  Row(
-                    children: [
-                      // Remove Expanded widget here
-                      Expanded(
-                       
-                        child: _buildStatsCard(
-                          title: 'Total Pelanggan',
-                          value: '$_totalCustomers',
-                          icon: Icons.people,
-                          color: Colors.blue,
-                        ),
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: _buildStatsCard(
-                          title: 'Total Barang',
-                          value: '$_totalBarang',
-                          icon: Icons.inventory,
-                          color: Colors.green,
-                        ),
-                      ),
-                      SizedBox(width: 16),
-                      if (_isLoading)
-                      CircularProgressIndicator(),
-                      if (!_isLoading) ...[
-                        Expanded(
-                          child: _buildStatsCard(
-                            title: 'Penjualan',
-                            value: '$_totalPenjualan',
-                            icon: Icons.shopping_cart,
-                            color: Colors.orange,
-                          ),
-                        ),
-                        SizedBox(height: 16),
-                        Expanded(
-                          child: _buildStatsCard(
-                            title: 'Total Pendapatan',
-                            value: 'RP $_totalPendapatan',
-                            icon: Icons.attach_money,
-                            color: Colors.purple,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  SizedBox(height: 32),
-                  SizedBox(height: 32),
+                  SizedBox(height: 10),
                   // Recent Activity
                   Container(
                     padding: EdgeInsets.all(24),
@@ -1109,33 +1083,31 @@ Widget _buildDashboardContent() {
                       ],
                     ),
                   child: Column(
-                    
+                  
                     children: [
-   
-    // Chart Type Toggle
-    Card(
-      margin: EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => setState(() => _showSalesChart = true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _showSalesChart ? Colors.blue : Colors.grey[300],
-                  foregroundColor: _showSalesChart ? Colors.white : Colors.black,
-                ),
-                child: Text('Penjualan'),
-              ),
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => setState(() => _showSalesChart = false),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: !_showSalesChart ? Colors.green : Colors.grey[300],
-                  foregroundColor: !_showSalesChart ? Colors.white : Colors.black,
+                  Card(
+                    margin: EdgeInsets.only(bottom: 16),
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () => setState(() => _showSalesChart = true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _showSalesChart ? Colors.blue : Colors.grey[300],
+                                foregroundColor: _showSalesChart ? Colors.white : Colors.black,
+                              ),
+                              child: Text('Penjualan'),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () => setState(() => _showSalesChart = false),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: !_showSalesChart ? Colors.green : Colors.grey[300],
+                                foregroundColor: !_showSalesChart ? Colors.white : Colors.black,
                 ),
                 child: Text('Pendapatan'),
               ),
