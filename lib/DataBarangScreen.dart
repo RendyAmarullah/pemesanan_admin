@@ -308,37 +308,46 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                 child: Align(
                   alignment: Alignment.topCenter,
                   child: Container(
-                     padding: const EdgeInsets.all(4.0),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.black, width: 1.0),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                    child: DataTable(
-                      columns: [
-                        DataColumn(label: Text('Gambar')),
-                        DataColumn(label: Text('Nama Barang')),
-                        DataColumn(label: Text('Harga')),
-                        DataColumn(label: Text('Kategori')),
-                        DataColumn(label: Text('Ubah')),
-                      ],
-                      rows: filteredProducts.map((product) {
-                        return DataRow(cells: [
-                          DataCell(product['imageUrl'] != ''
-                              ? Image.network(product['imageUrl'], width: 50, height: 50)
-                              : Icon(Icons.image, size: 50)),
-                          DataCell(Text(product['productName'])),
-                          DataCell(Text(product['price'])),
-                          DataCell(Text(product['category'])),
-                          DataCell(
-                            IconButton(
-                              icon: Icon(Icons.edit),
-                              onPressed: () => _showProductDialog(product: product),
-                            ),
-                          ),
-                        ]);
-                      }).toList(),
-                    ),
-                  ),
+          padding: const EdgeInsets.all(4.0),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.black, width: 1.0),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
+              child: DataTable(
+                columnSpacing: 30.0, 
+                columns: const [
+                  DataColumn(label: Text('Gambar')),
+                  DataColumn(label: Text('Nama Barang')),
+                  DataColumn(label: Text('Harga')),
+                  DataColumn(label: Text('Kategori')),
+                  DataColumn(label: Text('Ubah')),
+                ],
+                rows: filteredProducts.map((product) {
+                  return DataRow(cells: [
+                    DataCell(product['imageUrl'] != ''
+                        ? Image.network(product['imageUrl'], width: 50, height: 50)
+                        : const Icon(Icons.image, size: 50)),
+                    DataCell(Text(product['productName'])),
+                    DataCell(Text(product['price'])),
+                    DataCell(Text(product['category'])),
+                    DataCell(
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () => _showProductDialog(product: product),
+                      ),
+            ),
+          ]);
+        }).toList(),
+      ),
+    ),
+  ),
+),
+
                 ),
               ),
             ),

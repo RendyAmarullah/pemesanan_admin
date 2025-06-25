@@ -187,10 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   ),
-
                   SizedBox(height: 32),
-
-                  // Recent Activity
                   Expanded(
                     child: Container(
                       padding: EdgeInsets.all(24),

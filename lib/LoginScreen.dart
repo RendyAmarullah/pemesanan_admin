@@ -32,46 +32,33 @@ class _LoginScreenState extends State<LoginScreen> {
     account = Account(client);
     database = Databases(client);
   }
-
-  // Fungsi untuk login
   Future<void> _login() async {
-    
     if (_isLoading) return;
-
-    // Validasi
     if (_emailController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Email dan password harus diisi')),
       );
       return;
     }
-
     setState(() {
       _isLoading = true;
     });
-
     try {
-      // Buat session baru
       final session = await account.createEmailPasswordSession(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
       print("Login berhasil, session ID: ${session.$id}");
-
-      // Dapatkan user info
       final user = await account.get();
       print("User info: ${user.email}");
-
-      // Cek apakah user memiliki peran 'admin' di database
       final response = await database.getDocument(
         databaseId: databaseId,
         collectionId: collectionId,
         documentId: user.$id,
       );
-
       final roles = List<String>.from(response.data['roles'] ?? []);
-      
+
       if (roles.contains('admin')) {
         
         Navigator.pushReplacement(
@@ -81,15 +68,12 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       } else {
-       
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Akses ditolak: Anda bukan admin')),
         );
       }
-
     } on AppwriteException catch (e) {
       print("Login error: ${e.message} (Code: ${e.code})");
-
       String errorMessage;
       switch (e.code) {
         case 401:
@@ -128,14 +112,13 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo Image
+
               Image.asset(
                 "images/logosignup.png",  // Pastikan logo berada di folder 'assets'
                 height: 200,
               ),
               SizedBox(height: 40),
 
-              // Email input
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -145,7 +128,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               SizedBox(height: 20),
 
-              // Password input
               TextFormField(
                 obscureText: true,
                 controller: _passwordController,
@@ -154,8 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 enabled: !_isLoading,
               ),
               SizedBox(height: 40),
-
-              // Login Button
+              
               ElevatedButton(
                 onPressed: _isLoading ? null : _login,
                 style: ElevatedButton.styleFrom(

@@ -112,7 +112,6 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
     });
   }
 
-  // Fungsi untuk update status pelanggan
   Future<void> _updateStatus(String userId, String newStatus) async {
     try {
       await databases.updateDocument(
@@ -151,7 +150,6 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search field
             TextField(
               controller: searchController,
               decoration: InputDecoration(
@@ -163,62 +161,66 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
               onChanged: (value) => _filterData(),
             ),
             SizedBox(height: 20),
-
-            // Data Table
             Expanded(
               child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.vertical,
+                
+      
                   child: Container(
                     padding: const EdgeInsets.all(4.0),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.black, width: 1.0),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: DataTable(
-                      columns: [
-                        DataColumn(label: Text('Username')),
-                        DataColumn(label: Text('Email')),
-                        DataColumn(label: Text('Alamat')),
-                        DataColumn(label: Text('No. Handphone')),
-                        DataColumn(label: Text('Status')),
-                        DataColumn(label: Text('Actions')),
-                      ],
-                      rows: filteredCustomers.map((customer) {
-                        return DataRow(cells: [
-                          DataCell(Text(customer['username']!)),
-                          DataCell(Text(customer['email']!)),
-                          DataCell(Text(customer['alamat']!)),
-                          DataCell(Text(customer['noHandphone']!)),
-                          DataCell(Text(customer['status']!)),
-                          DataCell(
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                    customer['status'] == 'Aktif'
-                                        ? Icons.lock
-                                        : Icons.lock_open,
-                                    color: customer['status'] == 'Aktif'
-                                        ? Colors.red
-                                        : Colors.green,
-                                  ),
-                                  onPressed: () {
-                                    String newStatus = customer['status'] == 'Aktif'
-                                        ? 'Nonaktif'
-                                        : 'Aktif';
-                                    _updateStatus(customer['userId'], newStatus);
-                                  },
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.vertical,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
+                        child: DataTable(
+                          columnSpacing: 30.0,
+                          columns: const [
+                            DataColumn(label: Text('Username')),
+                            DataColumn(label: Text('Email')),
+                            DataColumn(label: Text('Alamat')),
+                            DataColumn(label: Text('No. Handphone')),
+                            DataColumn(label: Text('Status')),
+                            DataColumn(label: Text('Actions')),
+                          ],
+                          rows: filteredCustomers.map((customer) {
+                            return DataRow(cells: [
+                              DataCell(Text(customer['username']!)),
+                              DataCell(Text(customer['email']!)),
+                              DataCell(Text(customer['alamat']!)),
+                              DataCell(Text(customer['noHandphone']!)),
+                              DataCell(Text(customer['status']!)),
+                              DataCell(
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        customer['status'] == 'Aktif'
+                                            ? Icons.lock
+                                            : Icons.lock_open,
+                                        color: customer['status'] == 'Aktif'
+                                            ? Colors.red
+                                            : Colors.green,
+                                      ),
+                                      onPressed: () {
+                                        String newStatus = customer['status'] == 'Aktif'
+                                            ? 'Nonaktif'
+                                            : 'Aktif';
+                                        _updateStatus(customer['userId'], newStatus);
+                                      },
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
-                        ]);
-                      }).toList(),
+                              ),
+                            ]);
+                          }).toList(),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                
               ),
             ),
           ],
