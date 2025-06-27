@@ -113,7 +113,6 @@ class _RiwayatPesananState
         data: {'status': newStatus},
       );
 
-      // Update local state to reflect the changes
       setState(() {
         _allOrders = _allOrders.map((order) {
           if (order['orderId'] == orderId) {

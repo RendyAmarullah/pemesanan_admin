@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/models.dart' as models;
 import 'package:pemesanan_web/main.dart';
-import 'HomeScreen.dart'; // Import HomeScreen
+import 'HomeScreen.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -114,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
 
               Image.asset(
-                "images/logosignup.png",  // Pastikan logo berada di folder 'assets'
+                "images/logosignup.png",
                 height: 200,
               ),
               SizedBox(height: 40),

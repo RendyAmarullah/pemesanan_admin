@@ -1,9 +1,9 @@
-import 'dart:io'; // For File handling on desktop
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:appwrite/appwrite.dart';
-import 'package:file_picker/file_picker.dart'; // For file picking
-import 'package:image_picker/image_picker.dart'; // Optional, if using camera
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 
 class DataBarangScreen extends StatefulWidget {
   @override
@@ -22,11 +22,21 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
   final String bucketId = '681aa16f003054da8969';
   List<Map<String, dynamic>> products = [];
   List<Map<String, dynamic>> filteredProducts = [];
-  File? _imageFile; // Using Dart File instead of html.File
+  File? _imageFile;
   String _productImageUrl = '';
   TextEditingController searchController = TextEditingController();
 
-  List<String> categories = ['Makanan', 'Minuman', 'Bunsik', 'Non-halal', 'Barang', 'Beauty','Snack','Frozen','Mie'];
+  List<String> categories = [
+    'Makanan',
+    'Minuman',
+    'Bunsik',
+    'Non-halal',
+    'Barang',
+    'Beauty',
+    'Snack',
+    'Frozen',
+    'Mie'
+  ];
   List<String> status = ['Aktif', 'Nonaktif'];
 
   String selectedCategory = 'Makanan';
@@ -43,7 +53,8 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
     _loadProductsData();
   }
 
-  Future<void> _addProduct(String name, String price, String category, String deskripsi) async {
+  Future<void> _addProduct(
+      String name, String price, String category, String deskripsi) async {
     try {
       final parsedPrice = int.tryParse(price);
       if (parsedPrice == null) {
@@ -71,7 +82,8 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
     }
   }
 
-  Future<void> _editProduct(String productId, String name, String price, String category, String deskripsi) async {
+  Future<void> _editProduct(String productId, String name, String price,
+      String category, String deskripsi) async {
     try {
       final parsedPrice = int.tryParse(price);
       if (parsedPrice == null) {
@@ -79,7 +91,9 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
         return;
       }
 
-      String validProductId = productId.isNotEmpty && productId.length <= 36 ? productId : ID.unique();
+      String validProductId = productId.isNotEmpty && productId.length <= 36
+          ? productId
+          : ID.unique();
 
       await databases.updateDocument(
         databaseId: databaseId,
@@ -100,7 +114,8 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
   }
 
   Future<void> _pickImage() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
+    FilePickerResult? result =
+        await FilePicker.platform.pickFiles(type: FileType.image);
     if (result != null) {
       setState(() {
         _imageFile = File(result.files.single.path!);
@@ -143,7 +158,9 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
         products = response.documents.map((doc) {
           return {
             'productName': doc.data['name'] ?? 'No name',
-            'price': (doc.data['price'] != null && doc.data['price'] is int) ? doc.data['price'].toString() : 'No price',
+            'price': (doc.data['price'] != null && doc.data['price'] is int)
+                ? doc.data['price'].toString()
+                : 'No price',
             'category': doc.data['category'] ?? 'No category',
             'status': doc.data['status'] ?? 'Aktif',
             'productId': doc.$id,
@@ -180,10 +197,14 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
   }
 
   Future<void> _showProductDialog({Map<String, dynamic>? product}) async {
-    final TextEditingController nameController = TextEditingController(text: product?['productName']);
-    final TextEditingController priceController = TextEditingController(text: product?['price']);
-    final TextEditingController categoryController = TextEditingController(text: product?['category']);
-    final TextEditingController deskripsiController = TextEditingController(text: product?['deskripsi']);
+    final TextEditingController nameController =
+        TextEditingController(text: product?['productName']);
+    final TextEditingController priceController =
+        TextEditingController(text: product?['price']);
+    final TextEditingController categoryController =
+        TextEditingController(text: product?['category']);
+    final TextEditingController deskripsiController =
+        TextEditingController(text: product?['deskripsi']);
 
     return showDialog<void>(
       context: context,
@@ -214,7 +235,8 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                       selectedCategory = newValue!;
                     });
                   },
-                  items: categories.map<DropdownMenuItem<String>>((String value) {
+                  items:
+                      categories.map<DropdownMenuItem<String>>((String value) {
                     return DropdownMenuItem<String>(
                       value: value,
                       child: Text(value),
@@ -224,10 +246,12 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                 SizedBox(height: 10),
                 ElevatedButton(
                   onPressed: _pickImage,
-                  child: Text(product == null ? 'Pilih Gambar' : 'Ganti Gambar'),
+                  child:
+                      Text(product == null ? 'Pilih Gambar' : 'Ganti Gambar'),
                 ),
                 _imageFile != null
-                    ? Image.file(_imageFile!, width: 100, height: 100, fit: BoxFit.cover)
+                    ? Image.file(_imageFile!,
+                        width: 150, height: 150, fit: BoxFit.cover)
                     : SizedBox(),
               ],
             ),
@@ -270,7 +294,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -304,50 +327,50 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
             SizedBox(height: 20),
             Expanded(
               child: SingleChildScrollView(
-                
                 child: Align(
                   alignment: Alignment.topCenter,
                   child: Container(
-          padding: const EdgeInsets.all(4.0),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.black, width: 1.0),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
-              child: DataTable(
-                columnSpacing: 30.0, 
-                columns: const [
-                  DataColumn(label: Text('Gambar')),
-                  DataColumn(label: Text('Nama Barang')),
-                  DataColumn(label: Text('Harga')),
-                  DataColumn(label: Text('Kategori')),
-                  DataColumn(label: Text('Ubah')),
-                ],
-                rows: filteredProducts.map((product) {
-                  return DataRow(cells: [
-                    DataCell(product['imageUrl'] != ''
-                        ? Image.network(product['imageUrl'], width: 50, height: 50)
-                        : const Icon(Icons.image, size: 50)),
-                    DataCell(Text(product['productName'])),
-                    DataCell(Text(product['price'])),
-                    DataCell(Text(product['category'])),
-                    DataCell(
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () => _showProductDialog(product: product),
+                    padding: const EdgeInsets.all(12.0),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.black, width: 1.0),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.vertical,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                            minWidth: MediaQuery.of(context).size.width),
+                        child: DataTable(
+                          columnSpacing: 30.0,
+                          columns: const [
+                            DataColumn(label: Text('Gambar')),
+                            DataColumn(label: Text('Nama Barang')),
+                            DataColumn(label: Text('Harga')),
+                            DataColumn(label: Text('Kategori')),
+                            DataColumn(label: Text('Ubah')),
+                          ],
+                          rows: filteredProducts.map((product) {
+                            return DataRow(cells: [
+                              DataCell(product['imageUrl'] != ''
+                                  ? Image.network(product['imageUrl'],
+                                      width: 150, height: 150)
+                                  : const Icon(Icons.image, size: 50)),
+                              DataCell(Text(product['productName'])),
+                              DataCell(Text(product['price'])),
+                              DataCell(Text(product['category'])),
+                              DataCell(
+                                IconButton(
+                                  icon: const Icon(Icons.edit),
+                                  onPressed: () =>
+                                      _showProductDialog(product: product),
+                                ),
+                              ),
+                            ]);
+                          }).toList(),
+                        ),
                       ),
-            ),
-          ]);
-        }).toList(),
-      ),
-    ),
-  ),
-),
-
+                    ),
+                  ),
                 ),
               ),
             ),
