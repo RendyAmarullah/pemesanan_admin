@@ -27,19 +27,29 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
   TextEditingController searchController = TextEditingController();
 
   List<String> categories = [
-    'Makanan',
+    'All', // Tambahkan kategori All di awal
+    'Market',
     'Minuman',
     'Bunsik',
     'Non-halal',
     'Barang',
-    'Beauty',
-    'Snack',
-    'Frozen',
-    'Mie'
+    'Beauty'
   ];
+
+  // Kategori untuk dropdown di dialog (tanpa All)
+  List<String> categoriesForDialog = [
+    'Market',
+    'Minuman',
+    'Bunsik',
+    'Non-halal',
+    'Barang',
+    'Beauty'
+  ];
+
   List<String> status = ['Aktif', 'Nonaktif'];
 
-  String selectedCategory = 'Makanan';
+  String selectedCategory = 'All'; // Default ke All
+  String selectedCategoryForDialog = 'Market'; // Untuk dialog
   String selectedStatus = 'Aktif';
 
   @override
@@ -165,6 +175,7 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
             'status': doc.data['status'] ?? 'Aktif',
             'productId': doc.$id,
             'imageUrl': doc.data['productImageUrl'] ?? '',
+            'deskripsi': doc.data['deskripsi'] ?? '',
           };
         }).toList();
 
@@ -177,6 +188,7 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
 
   void _filterData() {
     setState(() {
+      // Filter berdasarkan search text
       filteredProducts = products
           .where((product) =>
               product['productName']!
@@ -190,9 +202,12 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                   .contains(searchController.text.toLowerCase()))
           .toList();
 
-      filteredProducts = filteredProducts.where((product) {
-        return product['category'] == selectedCategory;
-      }).toList();
+      // Filter berdasarkan kategori (jika bukan All, tampilkan semua)
+      if (selectedCategory != 'All') {
+        filteredProducts = filteredProducts.where((product) {
+          return product['category'] == selectedCategory;
+        }).toList();
+      }
     });
   }
 
@@ -206,86 +221,112 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
     final TextEditingController deskripsiController =
         TextEditingController(text: product?['deskripsi']);
 
+    // Set kategori untuk dialog
+    if (product != null && product['category'] != null) {
+      selectedCategoryForDialog = product['category'];
+    } else {
+      selectedCategoryForDialog = 'Market';
+    }
+
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(product == null ? 'Tambah Produk' : 'Edit Produk'),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(labelText: 'Nama Produk'),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(product == null ? 'Tambah Produk' : 'Edit Produk'),
+              content: SingleChildScrollView(
+                child: ListBody(
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(labelText: 'Nama Produk'),
+                    ),
+                    TextField(
+                      controller: priceController,
+                      decoration: InputDecoration(labelText: 'Harga'),
+                      keyboardType: TextInputType.number,
+                    ),
+                    TextField(
+                      controller: deskripsiController,
+                      decoration: InputDecoration(labelText: 'Deskripsi'),
+                    ),
+                    SizedBox(height: 10),
+                    DropdownButton<String>(
+                      value: selectedCategoryForDialog,
+                      onChanged: (String? newValue) {
+                        setDialogState(() {
+                          selectedCategoryForDialog = newValue!;
+                        });
+                      },
+                      items: categoriesForDialog
+                          .map<DropdownMenuItem<String>>((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                    ),
+                    SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: _pickImage,
+                      child: Text(
+                          product == null ? 'Pilih Gambar' : 'Ganti Gambar'),
+                    ),
+                    _imageFile != null
+                        ? Container(
+                            width: 100,
+                            height: 100,
+                            margin: EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(
+                                _imageFile!,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          )
+                        : SizedBox(),
+                  ],
                 ),
-                TextField(
-                  controller: priceController,
-                  decoration: InputDecoration(labelText: 'Harga'),
-                  keyboardType: TextInputType.number,
-                ),
-                TextField(
-                  controller: deskripsiController,
-                  decoration: InputDecoration(labelText: 'Deskripsi'),
-                ),
-                DropdownButton<String>(
-                  value: selectedCategory,
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      selectedCategory = newValue!;
-                    });
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: Text('Batal'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
                   },
-                  items:
-                      categories.map<DropdownMenuItem<String>>((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
-                    );
-                  }).toList(),
                 ),
-                SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: _pickImage,
-                  child:
-                      Text(product == null ? 'Pilih Gambar' : 'Ganti Gambar'),
+                TextButton(
+                  child: Text('Simpan'),
+                  onPressed: () {
+                    if (product == null) {
+                      _addProduct(
+                        nameController.text,
+                        priceController.text,
+                        selectedCategoryForDialog,
+                        deskripsiController.text,
+                      );
+                    } else {
+                      _editProduct(
+                        product['productId'],
+                        nameController.text,
+                        priceController.text,
+                        selectedCategoryForDialog,
+                        deskripsiController.text,
+                      );
+                    }
+                    Navigator.of(context).pop();
+                  },
                 ),
-                _imageFile != null
-                    ? Image.file(_imageFile!,
-                        width: 150, height: 150, fit: BoxFit.cover)
-                    : SizedBox(),
               ],
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: Text('Batal'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: Text('Simpan'),
-              onPressed: () {
-                if (product == null) {
-                  _addProduct(
-                    nameController.text,
-                    priceController.text,
-                    selectedCategory,
-                    deskripsiController.text,
-                  );
-                } else {
-                  _editProduct(
-                    product['productId'],
-                    nameController.text,
-                    priceController.text,
-                    selectedCategory,
-                    deskripsiController.text,
-                  );
-                }
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
+            );
+          },
         );
       },
     );
@@ -333,7 +374,7 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                     padding: const EdgeInsets.all(12.0),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.black, width: 1.0),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: SingleChildScrollView(
                       scrollDirection: Axis.vertical,
@@ -342,6 +383,8 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                             minWidth: MediaQuery.of(context).size.width),
                         child: DataTable(
                           columnSpacing: 30.0,
+                          dataRowHeight:
+                              80, // Tetapkan tinggi row untuk konsistensi
                           columns: const [
                             DataColumn(label: Text('Gambar')),
                             DataColumn(label: Text('Nama Barang')),
@@ -351,18 +394,115 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                           ],
                           rows: filteredProducts.map((product) {
                             return DataRow(cells: [
-                              DataCell(product['imageUrl'] != ''
-                                  ? Image.network(product['imageUrl'],
-                                      width: 150, height: 150)
-                                  : const Icon(Icons.image, size: 50)),
-                              DataCell(Text(product['productName'])),
-                              DataCell(Text(product['price'])),
-                              DataCell(Text(product['category'])),
                               DataCell(
-                                IconButton(
-                                  icon: const Icon(Icons.edit),
-                                  onPressed: () =>
-                                      _showProductDialog(product: product),
+                                Container(
+                                  padding: EdgeInsets.all(4),
+                                  child: product['imageUrl'] != ''
+                                      ? Container(
+                                          width: 60,
+                                          height: 60,
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                                color: Colors.grey.shade300),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            child: Image.network(
+                                              product['imageUrl'],
+                                              fit: BoxFit.cover,
+                                              errorBuilder:
+                                                  (context, error, stackTrace) {
+                                                return Container(
+                                                  color: Colors.grey.shade200,
+                                                  child: Icon(
+                                                    Icons.broken_image,
+                                                    color: Colors.grey,
+                                                    size: 30,
+                                                  ),
+                                                );
+                                              },
+                                              loadingBuilder: (context, child,
+                                                  loadingProgress) {
+                                                if (loadingProgress == null)
+                                                  return child;
+                                                return Container(
+                                                  color: Colors.grey.shade200,
+                                                  child: Center(
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      value: loadingProgress
+                                                                  .expectedTotalBytes !=
+                                                              null
+                                                          ? loadingProgress
+                                                                  .cumulativeBytesLoaded /
+                                                              loadingProgress
+                                                                  .expectedTotalBytes!
+                                                          : null,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        )
+                                      : Container(
+                                          width: 60,
+                                          height: 60,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade200,
+                                            border: Border.all(
+                                                color: Colors.grey.shade300),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Icon(
+                                            Icons.image,
+                                            color: Colors.grey,
+                                            size: 30,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              DataCell(
+                                Container(
+                                  padding: EdgeInsets.symmetric(vertical: 4),
+                                  child: Text(
+                                    product['productName'],
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 2,
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Container(
+                                  padding: EdgeInsets.symmetric(vertical: 4),
+                                  child: Text(
+                                    'Rp ${product['price']}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Container(
+                                  padding: EdgeInsets.symmetric(vertical: 4),
+                                  child: Text(
+                                    product['category'],
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Container(
+                                  padding: EdgeInsets.symmetric(vertical: 4),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.edit),
+                                    onPressed: () =>
+                                        _showProductDialog(product: product),
+                                  ),
                                 ),
                               ),
                             ]);
@@ -379,8 +519,8 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showProductDialog(),
-        child: Icon(Icons.add),
-        backgroundColor: Colors.blue,
+        child: Icon(Icons.add, color: Colors.white),
+        backgroundColor: Color(0xFF0072BC),
       ),
     );
   }

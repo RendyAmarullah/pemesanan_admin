@@ -12,10 +12,10 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
   late Databases databases;
   late Account account;
   String userId = '';
-  String projectId = '681aa0b70002469fc157';  
-  String databaseId = '681aa33a0023a8c7eb1f'; 
-  String usersCollectionId = '684083800031dfaaecad'; 
-  final String addressCollectionId = '68447d3d0007b5f75cc5'; 
+  String projectId = '681aa0b70002469fc157';
+  String databaseId = '681aa33a0023a8c7eb1f';
+  String usersCollectionId = '684083800031dfaaecad';
+  final String addressCollectionId = '68447d3d0007b5f75cc5';
   List<Map<String, dynamic>> customers = [];
   List<Map<String, dynamic>> filteredCustomers = [];
 
@@ -39,7 +39,7 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
         databaseId: databaseId,
         collectionId: usersCollectionId,
         queries: [
-          Query.equal('roles', 'pelanggan'), 
+          Query.equal('roles', 'pelanggan'),
         ],
       );
 
@@ -76,7 +76,8 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
 
         if (response.documents.isNotEmpty) {
           setState(() {
-            customers[i]['alamat'] = response.documents.first.data['address'] ?? 'Alamat tidak tersedia';
+            customers[i]['alamat'] = response.documents.first.data['address'] ??
+                'Alamat tidak tersedia';
           });
         }
       } catch (e) {
@@ -144,7 +145,6 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -156,71 +156,72 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
                 labelText: 'Cari Data',
                 prefixIcon: Icon(Icons.search),
                 border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                contentPadding:
+                    EdgeInsets.symmetric(vertical: 10, horizontal: 15),
               ),
               onChanged: (value) => _filterData(),
             ),
             SizedBox(height: 20),
             Expanded(
               child: SingleChildScrollView(
-                
-      
-                  child: Container(
-                    padding: const EdgeInsets.all(4.0),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black, width: 1.0),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.vertical,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width),
-                        child: DataTable(
-                          columnSpacing: 30.0,
-                          columns: const [
-                            DataColumn(label: Text('Username')),
-                            DataColumn(label: Text('Email')),
-                            DataColumn(label: Text('Alamat')),
-                            DataColumn(label: Text('No. Handphone')),
-                            DataColumn(label: Text('Status')),
-                            DataColumn(label: Text('Actions')),
-                          ],
-                          rows: filteredCustomers.map((customer) {
-                            return DataRow(cells: [
-                              DataCell(Text(customer['username']!)),
-                              DataCell(Text(customer['email']!)),
-                              DataCell(Text(customer['alamat']!)),
-                              DataCell(Text(customer['noHandphone']!)),
-                              DataCell(Text(customer['status']!)),
-                              DataCell(
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(
-                                        customer['status'] == 'Aktif'
-                                            ? Icons.lock
-                                            : Icons.lock_open,
-                                        color: customer['status'] == 'Aktif'
-                                            ? Colors.red
-                                            : Colors.green,
-                                      ),
-                                      onPressed: () {
-                                        String newStatus = customer['status'] == 'Aktif'
-                                            ? 'Nonaktif'
-                                            : 'Aktif';
-                                        _updateStatus(customer['userId'], newStatus);
-                                      },
+                child: Container(
+                  padding: const EdgeInsets.all(4.0),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black, width: 1.0),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.vertical,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                          minWidth: MediaQuery.of(context).size.width),
+                      child: DataTable(
+                        columnSpacing: 30.0,
+                        columns: const [
+                          DataColumn(label: Text('Username')),
+                          DataColumn(label: Text('Email')),
+                          DataColumn(label: Text('Alamat')),
+                          DataColumn(label: Text('No. Handphone')),
+                          DataColumn(label: Text('Status')),
+                          DataColumn(label: Text('Actions')),
+                        ],
+                        rows: filteredCustomers.map((customer) {
+                          return DataRow(cells: [
+                            DataCell(Text(customer['username']!)),
+                            DataCell(Text(customer['email']!)),
+                            DataCell(Text(customer['alamat']!)),
+                            DataCell(Text(customer['noHandphone']!)),
+                            DataCell(Text(customer['status']!)),
+                            DataCell(
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      customer['status'] == 'Aktif'
+                                          ? Icons.lock
+                                          : Icons.lock_open,
+                                      color: customer['status'] == 'Aktif'
+                                          ? Colors.red
+                                          : Colors.green,
                                     ),
-                                  ],
-                                ),
+                                    onPressed: () {
+                                      String newStatus =
+                                          customer['status'] == 'Aktif'
+                                              ? 'Nonaktif'
+                                              : 'Aktif';
+                                      _updateStatus(
+                                          customer['userId'], newStatus);
+                                    },
+                                  ),
+                                ],
                               ),
-                            ]);
-                          }).toList(),
-                        ),
+                            ),
+                          ]);
+                        }).toList(),
                       ),
                     ),
                   ),
-                
+                ),
               ),
             ),
           ],
