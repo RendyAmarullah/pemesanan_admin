@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:appwrite/appwrite.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 
 class DataBarangScreen extends StatefulWidget {
   @override
@@ -27,7 +29,7 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
   TextEditingController searchController = TextEditingController();
 
   List<String> categories = [
-    'All', // Tambahkan kategori All di awal
+    'All',
     'Market',
     'Minuman',
     'Bunsik',
@@ -36,7 +38,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
     'Beauty'
   ];
 
-  // Kategori untuk dropdown di dialog (tanpa All)
   List<String> categoriesForDialog = [
     'Market',
     'Minuman',
@@ -48,9 +49,32 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
 
   List<String> status = ['Aktif', 'Nonaktif'];
 
-  String selectedCategory = 'All'; // Default ke All
-  String selectedCategoryForDialog = 'Market'; // Untuk dialog
+  String selectedCategory = 'All';
+  String selectedCategoryForDialog =
+      'Market'; // Perbaikan: gunakan kategori yang ada
   String selectedStatus = 'Aktif';
+
+  // Formatter untuk format rupiah
+  final NumberFormat currencyFormatter = NumberFormat('#,###', 'id_ID');
+
+  // Fungsi untuk format rupiah
+  String formatRupiah(int amount) {
+    return currencyFormatter.format(amount);
+  }
+
+  // Fungsi untuk parse harga dari string (menghilangkan titik)
+  int parsePrice(String priceText) {
+    try {
+      String cleanPrice =
+          priceText.replaceAll('.', '').replaceAll(',', '').trim();
+      if (cleanPrice.isEmpty) {
+        throw FormatException('Harga tidak boleh kosong');
+      }
+      return int.parse(cleanPrice);
+    } catch (e) {
+      throw FormatException('Format harga tidak valid');
+    }
+  }
 
   @override
   void initState() {
@@ -66,79 +90,271 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
   Future<void> _addProduct(
       String name, String price, String category, String deskripsi) async {
     try {
-      final parsedPrice = int.tryParse(price);
-      if (parsedPrice == null) {
-        print("Masukkan harga yang valid");
+      // Validasi input
+      if (name.trim().isEmpty) {
+        _showErrorSnackBar('Nama produk tidak boleh kosong');
         return;
       }
 
-      await databases.createDocument(
+      if (price.trim().isEmpty) {
+        _showErrorSnackBar('Harga tidak boleh kosong');
+        return;
+      }
+
+      try {
+        final parsedPrice = parsePrice(price.trim());
+        if (parsedPrice < 0) {
+          _showErrorSnackBar('Masukkan harga yang valid (angka positif)');
+          return;
+        }
+      } catch (e) {
+        _showErrorSnackBar('Format harga tidak valid');
+        return;
+      }
+
+      final parsedPrice = parsePrice(price.trim());
+
+      if (category.trim().isEmpty) {
+        _showErrorSnackBar('Kategori tidak boleh kosong');
+        return;
+      }
+
+      // Data yang akan disimpan
+      final productData = {
+        'name': name.trim(),
+        'price': parsedPrice,
+        'category': category,
+        'deskripsi': deskripsi.trim(),
+        'status': selectedStatus,
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+
+      // Tambahkan URL gambar jika ada
+      if (_productImageUrl.isNotEmpty) {
+        productData['productImageUrl'] = _productImageUrl;
+      }
+
+      print('Menambah produk dengan data: $productData'); // Debug log
+
+      final result = await databases.createDocument(
         databaseId: databaseId,
         collectionId: productsCollectionId,
-        documentId: 'unique()',
-        data: {
-          'name': name,
-          'price': parsedPrice,
-          'productImageUrl': _productImageUrl,
-          'deskripsi': deskripsi,
-          'status': selectedStatus,
-          'category': category,
-          'createdAt': DateTime.now().toIso8601String(),
-        },
+        documentId: ID.unique(), // Gunakan ID.unique() tanpa string
+        data: productData,
       );
-      _loadProductsData();
+
+      print('Produk berhasil ditambahkan: ${result.$id}'); // Debug log
+
+      // Reset state setelah berhasil
+      _imageFile = null;
+      _productImageUrl = '';
+
+      await _loadProductsData();
+      _showSuccessSnackBar('Produk berhasil ditambahkan!');
     } catch (e) {
       print("Error adding product: $e");
+      _showErrorSnackBar('Gagal menambahkan produk: ${e.toString()}');
     }
   }
 
   Future<void> _editProduct(String productId, String name, String price,
-      String category, String deskripsi) async {
+      String category, String deskripsi, String currentImageUrl) async {
     try {
-      final parsedPrice = int.tryParse(price);
-      if (parsedPrice == null) {
-        print("Invalid price input. Please enter a valid number.");
+      // Validasi input
+      if (name.trim().isEmpty) {
+        _showErrorSnackBar('Nama produk tidak boleh kosong');
         return;
       }
 
-      String validProductId = productId.isNotEmpty && productId.length <= 36
-          ? productId
-          : ID.unique();
+      if (price.trim().isEmpty) {
+        _showErrorSnackBar('Harga tidak boleh kosong');
+        return;
+      }
+
+      try {
+        final parsedPrice = parsePrice(price.trim());
+        if (parsedPrice < 0) {
+          _showErrorSnackBar('Masukkan harga yang valid (angka positif)');
+          return;
+        }
+      } catch (e) {
+        _showErrorSnackBar('Format harga tidak valid');
+        return;
+      }
+
+      final parsedPrice = parsePrice(price.trim());
+
+      if (productId.isEmpty) {
+        _showErrorSnackBar('ID produk tidak valid');
+        return;
+      }
+
+      // Gunakan gambar baru jika ada, jika tidak gunakan gambar lama
+      String finalImageUrl =
+          _productImageUrl.isNotEmpty ? _productImageUrl : currentImageUrl;
+
+      final updateData = {
+        'name': name.trim(),
+        'price': parsedPrice,
+        'category': category,
+        'deskripsi': deskripsi.trim(),
+      };
+
+      if (finalImageUrl.isNotEmpty) {
+        updateData['productImageUrl'] = finalImageUrl;
+      }
+
+      print(
+          'Mengupdate produk $productId dengan data: $updateData'); // Debug log
 
       await databases.updateDocument(
         databaseId: databaseId,
         collectionId: productsCollectionId,
-        documentId: validProductId,
-        data: {
-          'name': name,
-          'price': parsedPrice,
-          'category': category,
-          'deskripsi': deskripsi,
-          'productImageUrl': _productImageUrl,
-        },
+        documentId: productId,
+        data: updateData,
       );
-      _loadProductsData();
+
+      // Reset state setelah berhasil
+      _imageFile = null;
+      _productImageUrl = '';
+
+      await _loadProductsData();
+      _showSuccessSnackBar('Produk berhasil diperbarui!');
     } catch (e) {
       print("Error editing product: $e");
+      _showErrorSnackBar('Gagal memperbarui produk: ${e.toString()}');
+    }
+  }
+
+  Future<void> _deleteProduct(String productId, String productName) async {
+    try {
+      if (productId.isEmpty) {
+        _showErrorSnackBar('ID produk tidak valid');
+        return;
+      }
+
+      await databases.deleteDocument(
+        databaseId: databaseId,
+        collectionId: productsCollectionId,
+        documentId: productId,
+      );
+
+      await _loadProductsData();
+      _showSuccessSnackBar('Produk "$productName" berhasil dihapus!');
+    } catch (e) {
+      print("Error deleting product: $e");
+      _showErrorSnackBar('Gagal menghapus produk: ${e.toString()}');
+    }
+  }
+
+  Future<void> _showDeleteConfirmationDialog(
+      String productId, String productName) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Konfirmasi Hapus'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                Text('Apakah Anda yakin ingin menghapus produk ini?'),
+                SizedBox(height: 10),
+                Text(
+                  '"$productName"',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'Tindakan ini tidak dapat dibatalkan.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text(
+                'Batal',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text(
+                'Hapus',
+                style: TextStyle(color: Colors.red),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteProduct(productId, productName);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
     }
   }
 
   Future<void> _pickImage() async {
-    FilePickerResult? result =
-        await FilePicker.platform.pickFiles(type: FileType.image);
-    if (result != null) {
-      setState(() {
-        _imageFile = File(result.files.single.path!);
-      });
-      await _uploadImage();
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        setState(() {
+          _imageFile = File(result.files.single.path!);
+        });
+        await _uploadImage();
+      }
+    } catch (e) {
+      print("Error picking image: $e");
+      _showErrorSnackBar('Gagal memilih gambar: ${e.toString()}');
     }
   }
 
   Future<void> _uploadImage() async {
     if (_imageFile == null) return;
+
     try {
-      final fileId = DateTime.now().millisecondsSinceEpoch.toString();
+      final fileId = 'product_${DateTime.now().millisecondsSinceEpoch}';
       final inputFile = InputFile.fromPath(path: _imageFile!.path);
+
+      print('Uploading image with fileId: $fileId'); // Debug log
 
       final result = await _storage.createFile(
         bucketId: bucketId,
@@ -147,30 +363,38 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
       );
 
       final fileViewUrl =
-          'https://fra.cloud.appwrite.io/v1/storage/buckets/$bucketId/files/${result.$id}/view?project=$projectId';
+          'https://cloud.appwrite.io/v1/storage/buckets/$bucketId/files/${result.$id}/view?project=$projectId';
 
       setState(() {
         _productImageUrl = fileViewUrl;
       });
+
+      print('Image uploaded successfully: $_productImageUrl'); // Debug log
     } catch (e) {
       print("Error uploading image: $e");
+      _showErrorSnackBar('Gagal mengupload gambar: ${e.toString()}');
     }
   }
 
   Future<void> _loadProductsData() async {
     try {
+      print('Loading products data...'); // Debug log
+
       final response = await databases.listDocuments(
         databaseId: databaseId,
         collectionId: productsCollectionId,
       );
 
+      print('Loaded ${response.documents.length} products'); // Debug log
+
       setState(() {
         products = response.documents.map((doc) {
           return {
             'productName': doc.data['name'] ?? 'No name',
-            'price': (doc.data['price'] != null && doc.data['price'] is int)
-                ? doc.data['price'].toString()
-                : 'No price',
+            'price': (doc.data['price'] != null)
+                ? formatRupiah(doc.data['price'])
+                : '0',
+            'rawPrice': doc.data['price'] ?? 0, // Simpan harga asli untuk edit
             'category': doc.data['category'] ?? 'No category',
             'status': doc.data['status'] ?? 'Aktif',
             'productId': doc.$id,
@@ -183,12 +407,12 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
       });
     } catch (e) {
       print("Error loading products data: $e");
+      _showErrorSnackBar('Gagal memuat data produk: ${e.toString()}');
     }
   }
 
   void _filterData() {
     setState(() {
-      // Filter berdasarkan search text
       filteredProducts = products
           .where((product) =>
               product['productName']!
@@ -202,7 +426,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                   .contains(searchController.text.toLowerCase()))
           .toList();
 
-      // Filter berdasarkan kategori (jika bukan All, tampilkan semua)
       if (selectedCategory != 'All') {
         filteredProducts = filteredProducts.where((product) {
           return product['category'] == selectedCategory;
@@ -213,19 +436,26 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
 
   Future<void> _showProductDialog({Map<String, dynamic>? product}) async {
     final TextEditingController nameController =
-        TextEditingController(text: product?['productName']);
-    final TextEditingController priceController =
-        TextEditingController(text: product?['price']);
-    final TextEditingController categoryController =
-        TextEditingController(text: product?['category']);
+        TextEditingController(text: product?['productName'] ?? '');
+    final TextEditingController priceController = TextEditingController(
+        text: product != null ? product['rawPrice'].toString() : '');
     final TextEditingController deskripsiController =
-        TextEditingController(text: product?['deskripsi']);
+        TextEditingController(text: product?['deskripsi'] ?? '');
+
+    // Reset state gambar untuk dialog baru
+    _imageFile = null;
+    _productImageUrl = '';
+
+    // Simpan URL gambar saat ini untuk edit
+    String currentImageUrl = product?['imageUrl'] ?? '';
 
     // Set kategori untuk dialog
-    if (product != null && product['category'] != null) {
+    if (product != null &&
+        product['category'] != null &&
+        categoriesForDialog.contains(product['category'])) {
       selectedCategoryForDialog = product['category'];
     } else {
-      selectedCategoryForDialog = 'Market';
+      selectedCategoryForDialog = categoriesForDialog.first;
     }
 
     return showDialog<void>(
@@ -234,97 +464,273 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text(product == null ? 'Tambah Produk' : 'Edit Produk'),
-              content: SingleChildScrollView(
-                child: ListBody(
+            return Dialog(
+              insetPadding: EdgeInsets.all(20),
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.5,
+                height: MediaQuery.of(context).size.height * 0.8,
+                padding: EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextField(
-                      controller: nameController,
-                      decoration: InputDecoration(labelText: 'Nama Produk'),
+                    Text(
+                      product == null ? 'Tambah Produk' : 'Edit Produk',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    TextField(
-                      controller: priceController,
-                      decoration: InputDecoration(labelText: 'Harga'),
-                      keyboardType: TextInputType.number,
-                    ),
-                    TextField(
-                      controller: deskripsiController,
-                      decoration: InputDecoration(labelText: 'Deskripsi'),
-                    ),
-                    SizedBox(height: 10),
-                    DropdownButton<String>(
-                      value: selectedCategoryForDialog,
-                      onChanged: (String? newValue) {
-                        setDialogState(() {
-                          selectedCategoryForDialog = newValue!;
-                        });
-                      },
-                      items: categoriesForDialog
-                          .map<DropdownMenuItem<String>>((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                    ),
-                    SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: _pickImage,
-                      child: Text(
-                          product == null ? 'Pilih Gambar' : 'Ganti Gambar'),
-                    ),
-                    _imageFile != null
-                        ? Container(
-                            width: 100,
-                            height: 100,
-                            margin: EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.file(
-                                _imageFile!,
-                                fit: BoxFit.cover,
+                    SizedBox(height: 20),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            TextField(
+                              controller: nameController,
+                              decoration: InputDecoration(
+                                labelText: 'Nama Produk *',
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
                               ),
                             ),
-                          )
-                        : SizedBox(),
+                            SizedBox(height: 16),
+                            TextField(
+                              controller: priceController,
+                              decoration: InputDecoration(
+                                labelText: 'Harga *',
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                                prefixText: 'Rp ',
+                                hintText: 'Contoh: 15000 atau 15.000',
+                              ),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                    RegExp(r'[0-9.]')),
+                              ],
+                            ),
+                            SizedBox(height: 16),
+                            TextField(
+                              controller: deskripsiController,
+                              decoration: InputDecoration(
+                                labelText: 'Deskripsi',
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                              ),
+                              maxLines: 3,
+                            ),
+                            SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 4),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: DropdownButton<String>(
+                                value: selectedCategoryForDialog,
+                                isExpanded: true,
+                                underline: SizedBox(),
+                                onChanged: (String? newValue) {
+                                  setDialogState(() {
+                                    selectedCategoryForDialog = newValue!;
+                                  });
+                                },
+                                items: categoriesForDialog
+                                    .map<DropdownMenuItem<String>>(
+                                        (String value) {
+                                  return DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(value),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                            SizedBox(height: 20),
+
+                            // Tampilkan gambar saat ini jika dalam mode edit
+                            if (product != null &&
+                                currentImageUrl.isNotEmpty &&
+                                _imageFile == null)
+                              Column(
+                                children: [
+                                  Text(
+                                    'Gambar Saat Ini:',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Container(
+                                    width: 100,
+                                    height: 100,
+                                    margin: EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(
+                                        currentImageUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
+                                          return Container(
+                                            color: Colors.grey.shade200,
+                                            child: Icon(
+                                              Icons.broken_image,
+                                              color: Colors.grey,
+                                              size: 30,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: 16),
+                                ],
+                              ),
+
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  await _pickImage();
+                                  setDialogState(() {});
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                child: Text(
+                                  product == null
+                                      ? 'Pilih Gambar'
+                                      : 'Ganti Gambar',
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 16),
+
+                            // Tampilkan preview gambar baru jika ada
+                            if (_imageFile != null)
+                              Column(
+                                children: [
+                                  Text(
+                                    'Gambar Baru:',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Container(
+                                    width: 100,
+                                    height: 100,
+                                    margin: EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.green),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(
+                                        _imageFile!,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                            SizedBox(height: 16),
+                            Text(
+                              '* Field wajib diisi',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          child: Text(
+                            'Batal',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          onPressed: () {
+                            // Reset state gambar saat cancel
+                            _imageFile = null;
+                            _productImageUrl = '';
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                        SizedBox(width: 12),
+                        ElevatedButton(
+                          child: Text(
+                            'Simpan',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 15, vertical: 12),
+                          ),
+                          onPressed: () async {
+                            // Validasi input sebelum simpan
+                            if (nameController.text.trim().isEmpty ||
+                                priceController.text.trim().isEmpty) {
+                              _showErrorSnackBar(
+                                  'Nama produk dan harga wajib diisi');
+                              return;
+                            }
+
+                            // Validasi format harga
+                            try {
+                              parsePrice(priceController.text.trim());
+                            } catch (e) {
+                              _showErrorSnackBar('Format harga tidak valid');
+                              return;
+                            }
+
+                            if (product == null) {
+                              await _addProduct(
+                                nameController.text,
+                                priceController.text,
+                                selectedCategoryForDialog,
+                                deskripsiController.text,
+                              );
+                            } else {
+                              await _editProduct(
+                                product['productId'],
+                                nameController.text,
+                                priceController.text,
+                                selectedCategoryForDialog,
+                                deskripsiController.text,
+                                currentImageUrl,
+                              );
+                            }
+
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              actions: <Widget>[
-                TextButton(
-                  child: Text('Batal'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-                TextButton(
-                  child: Text('Simpan'),
-                  onPressed: () {
-                    if (product == null) {
-                      _addProduct(
-                        nameController.text,
-                        priceController.text,
-                        selectedCategoryForDialog,
-                        deskripsiController.text,
-                      );
-                    } else {
-                      _editProduct(
-                        product['productId'],
-                        nameController.text,
-                        priceController.text,
-                        selectedCategoryForDialog,
-                        deskripsiController.text,
-                      );
-                    }
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
             );
           },
         );
@@ -382,15 +788,14 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                         constraints: BoxConstraints(
                             minWidth: MediaQuery.of(context).size.width),
                         child: DataTable(
-                          columnSpacing: 30.0,
-                          dataRowHeight:
-                              80, // Tetapkan tinggi row untuk konsistensi
+                          columnSpacing: 20.0,
+                          dataRowHeight: 80,
                           columns: const [
                             DataColumn(label: Text('Gambar')),
                             DataColumn(label: Text('Nama Barang')),
                             DataColumn(label: Text('Harga')),
                             DataColumn(label: Text('Kategori')),
-                            DataColumn(label: Text('Ubah')),
+                            DataColumn(label: Text('Aksi')),
                           ],
                           rows: filteredProducts.map((product) {
                             return DataRow(cells: [
@@ -498,10 +903,27 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                               DataCell(
                                 Container(
                                   padding: EdgeInsets.symmetric(vertical: 4),
-                                  child: IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    onPressed: () =>
-                                        _showProductDialog(product: product),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: Icon(Icons.edit,
+                                            color: Color(0xFF0072BC)),
+                                        tooltip: 'Edit Produk',
+                                        onPressed: () => _showProductDialog(
+                                            product: product),
+                                      ),
+                                      IconButton(
+                                        icon: Icon(Icons.delete,
+                                            color: Colors.red),
+                                        tooltip: 'Hapus Produk',
+                                        onPressed: () =>
+                                            _showDeleteConfirmationDialog(
+                                          product['productId'],
+                                          product['productName'],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -523,5 +945,11 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
         backgroundColor: Color(0xFF0072BC),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 }

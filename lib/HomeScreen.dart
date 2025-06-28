@@ -27,9 +27,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _initAppwrite();
     _fetchCustomerCount();
   }
+
   void _initAppwrite() {
     _databases = Databases(client);
   }
+
   Future<void> _fetchCustomerCount() async {
     setState(() {
       _isLoading = true;
@@ -54,6 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
