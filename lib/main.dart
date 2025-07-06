@@ -149,6 +149,23 @@ class _MainLayoutState extends State<MainLayout> {
     'Des'
   ];
 
+  String formatPrice(dynamic price) {
+    String priceStr = price.toString();
+    if (price is double) priceStr = price.toInt().toString();
+
+    String result = '';
+    int count = 0;
+    for (int i = priceStr.length - 1; i >= 0; i--) {
+      if (count == 3) {
+        result = '.$result';
+        count = 0;
+      }
+      result = '${priceStr[i]}$result';
+      count++;
+    }
+    return result;
+  }
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     await Future.wait([
@@ -315,10 +332,13 @@ class _MainLayoutState extends State<MainLayout> {
   Future<void> _ambilPendapatan(int tahun) async {
     setState(() {
       _isLoading = true;
+      _pendapatanPerBulan.clear(); // Clear previous data
     });
 
     try {
-      double totalpendapatan = 0;
+      double totalPendapatan = 0;
+
+      // Loop through each month
       for (int bulan = 1; bulan <= 12; bulan++) {
         final result = await _databases.listDocuments(
           databaseId: databaseId,
@@ -332,14 +352,27 @@ class _MainLayoutState extends State<MainLayout> {
           ],
         );
 
-        double totalRevenue = 0;
+        double pendapatanBulan = 0;
         for (var doc in result.documents) {
-          totalpendapatan += doc.data['total'] ?? 0.0;
+          double total = 0;
+          // Handle different data types for total field
+          if (doc.data['total'] is int) {
+            total = (doc.data['total'] as int).toDouble();
+          } else if (doc.data['total'] is double) {
+            total = doc.data['total'] as double;
+          } else if (doc.data['total'] is String) {
+            total = double.tryParse(doc.data['total'] as String) ?? 0.0;
+          }
+          pendapatanBulan += total;
         }
+
+        // Store monthly revenue
+        _pendapatanPerBulan[bulan] = pendapatanBulan;
+        totalPendapatan += pendapatanBulan;
       }
 
       setState(() {
-        _totalPendapatan = totalpendapatan;
+        _totalPendapatan = totalPendapatan;
         _isLoading = false;
       });
     } catch (e) {
@@ -469,7 +502,7 @@ class _MainLayoutState extends State<MainLayout> {
         barRods: [
           BarChartRodData(
             toY: (_penjualanPerBulan[month] ?? 0).toDouble(),
-            color: Colors.blue,
+            color: Color(0xFF0072BC),
             width: 20,
             borderRadius: BorderRadius.circular(4),
           ),
@@ -530,28 +563,74 @@ class _MainLayoutState extends State<MainLayout> {
       return FlSpot(month.toDouble(), _pendapatanPerBulan[month] ?? 0);
     });
 
+    // Calculate maxY for better chart scaling
+    double maxY = 0;
+    if (_pendapatanPerBulan.values.isNotEmpty) {
+      maxY = _pendapatanPerBulan.values.reduce((a, b) => a > b ? a : b);
+    }
+    maxY = maxY * 1.2; // Add 20% padding
+    if (maxY == 0) maxY = 100000;
+
     return LineChart(
       LineChartData(
-        gridData: FlGridData(show: true, drawVerticalLine: false),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: true,
+          horizontalInterval: maxY / 5,
+          verticalInterval: 1,
+          getDrawingHorizontalLine: (value) {
+            return FlLine(
+              color: Colors.grey.withOpacity(0.3),
+              strokeWidth: 1,
+            );
+          },
+          getDrawingVerticalLine: (value) {
+            return FlLine(
+              color: Colors.grey.withOpacity(0.3),
+              strokeWidth: 1,
+            );
+          },
+        ),
         titlesData: FlTitlesData(
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 60,
+              reservedSize: 80,
+              interval: maxY / 5,
               getTitlesWidget: (value, meta) {
-                return Text(_formatCurrency(value),
-                    style: TextStyle(fontSize: 10));
+                return Container(
+                  padding: EdgeInsets.only(right: 8),
+                  child: Text(
+                    'Rp ${formatPrice(value)}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
+                );
               },
             ),
           ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
+              interval: 1,
               getTitlesWidget: (value, meta) {
                 int index = value.toInt() - 1;
                 if (index >= 0 && index < _monthNames.length) {
-                  return Text(_monthNames[index],
-                      style: TextStyle(fontSize: 12));
+                  return Container(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      _monthNames[index],
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
                 }
                 return Text('');
               },
@@ -560,49 +639,103 @@ class _MainLayoutState extends State<MainLayout> {
           topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
-        borderData: FlBorderData(show: true),
+        borderData: FlBorderData(
+          show: true,
+          border: Border.all(
+            color: Colors.grey.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
         minX: 1,
         maxX: 12,
         minY: 0,
+        maxY: maxY,
         lineBarsData: [
           LineChartBarData(
             spots: spots,
-            isCurved: true,
+            isCurved: false, // Diubah dari true ke false untuk garis lurus
             color: Colors.green,
-            barWidth: 3,
-            dotData: FlDotData(show: true),
+            barWidth: 4,
+            isStrokeCapRound: true,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, barData, index) {
+                return FlDotCirclePainter(
+                  radius: 6,
+                  color: Colors.green,
+                  strokeWidth: 2,
+                  strokeColor: Colors.white,
+                );
+              },
+            ),
             belowBarData: BarAreaData(
               show: true,
-              color: Colors.green.withOpacity(0.1),
+              gradient: LinearGradient(
+                colors: [
+                  Colors.green.withOpacity(0.3),
+                  Colors.green.withOpacity(0.1),
+                  Colors.green.withOpacity(0.05),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+            shadow: Shadow(
+              color: Colors.green.withOpacity(0.2),
+              offset: Offset(0, 2),
+              blurRadius: 4,
             ),
           ),
         ],
         lineTouchData: LineTouchData(
+          enabled: true,
           touchTooltipData: LineTouchTooltipData(
-            tooltipBgColor: Colors.green,
+            tooltipBgColor: Colors.green.withOpacity(0.9),
+            tooltipRoundedRadius: 12,
+            tooltipPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            tooltipMargin: 8,
             getTooltipItems: (touchedSpots) {
               return touchedSpots.map((touchedSpot) {
                 int monthIndex = touchedSpot.x.toInt() - 1;
                 String monthName = _monthNames[monthIndex];
                 return LineTooltipItem(
-                  '$monthName\nRp ${_formatCurrency(touchedSpot.y)}',
-                  TextStyle(color: Colors.white),
+                  '$monthName ${_selectedYear}\nRp ${formatPrice(touchedSpot.y)}',
+                  TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
                 );
               }).toList();
             },
           ),
+          getTouchedSpotIndicator:
+              (LineChartBarData barData, List<int> spotIndexes) {
+            return spotIndexes.map((spotIndex) {
+              return TouchedSpotIndicatorData(
+                FlLine(
+                  color: Colors.green,
+                  strokeWidth: 2,
+                  dashArray: [5, 5],
+                ),
+                FlDotData(
+                  getDotPainter: (spot, percent, barData, index) {
+                    return FlDotCirclePainter(
+                      radius: 8,
+                      color: Colors.green,
+                      strokeWidth: 3,
+                      strokeColor: Colors.white,
+                    );
+                  },
+                ),
+              );
+            }).toList();
+          },
+          handleBuiltInTouches: true,
+          touchSpotThreshold: 10,
         ),
       ),
     );
-  }
-
-  String _formatCurrency(double amount) {
-    if (amount >= 1000000) {
-      return '${(amount / 1000000).toStringAsFixed(1)}M';
-    } else if (amount >= 1000) {
-      return '${(amount / 1000).toStringAsFixed(1)}K';
-    }
-    return amount.toStringAsFixed(0);
   }
 
   void _logout() async {
@@ -900,71 +1033,6 @@ class _MainLayoutState extends State<MainLayout> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            spreadRadius: 1,
-                            blurRadius: 10,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Color(0xFF1976D2).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.dashboard,
-                              color: Color(0xFF1976D2),
-                              size: 32,
-                            ),
-                          ),
-                          SizedBox(width: 20),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Selamat Datang di Dashboard!',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[800],
-                                  ),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Kelola data pelanggan, barang, dan penjualan Anda dengan mudah',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 32),
-                    Text(
-                      'Ringkasan',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                    SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
@@ -972,10 +1040,9 @@ class _MainLayoutState extends State<MainLayout> {
                             title: 'Total Pelanggan',
                             value: '$_totalCustomers',
                             icon: Icons.people,
-                            color: Colors.blue,
+                            color: Color(0xFF0072BC),
                           ),
                         ),
-                        SizedBox(width: 16),
                         Expanded(
                           child: _buildStatsCard(
                             title: 'Total Barang',
@@ -987,7 +1054,7 @@ class _MainLayoutState extends State<MainLayout> {
                       ],
                     ),
                     SizedBox(
-                      height: 16,
+                      height: 14,
                     ),
                     Card(
                       margin: EdgeInsets.only(bottom: 16),
@@ -1031,11 +1098,9 @@ class _MainLayoutState extends State<MainLayout> {
                               int.tryParse(value) ?? DateTime.now().year;
                         });
                       },
-                      
                       keyboardType: TextInputType.number,
                     ),
-                    SizedBox(height: 12),
-                   
+                    SizedBox(height: 10),
                     SizedBox(height: 10),
                     Container(
                       padding: EdgeInsets.all(24),
@@ -1065,7 +1130,7 @@ class _MainLayoutState extends State<MainLayout> {
                                           () => _showSalesChart = true),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: _showSalesChart
-                                            ? Colors.blue
+                                            ? Color(0xFF0072BC)
                                             : Colors.grey[300],
                                         foregroundColor: _showSalesChart
                                             ? Colors.white
@@ -1104,7 +1169,7 @@ class _MainLayoutState extends State<MainLayout> {
                                     child: Column(
                                       children: [
                                         Icon(Icons.shopping_cart,
-                                            size: 32, color: Colors.blue),
+                                            size: 32, color: Color(0xFF0072BC)),
                                         SizedBox(height: 8),
                                         Text(
                                           'Total Penjualan',
@@ -1115,7 +1180,7 @@ class _MainLayoutState extends State<MainLayout> {
                                         Text(
                                           '$_totalPenjualan',
                                           style: TextStyle(
-                                              fontSize: 24,
+                                              fontSize: 16,
                                               fontWeight: FontWeight.bold),
                                         ),
                                       ],
@@ -1123,7 +1188,7 @@ class _MainLayoutState extends State<MainLayout> {
                                   ),
                                 ),
                               ),
-                              SizedBox(width: 16),
+                              SizedBox(width: 10),
                               Expanded(
                                 child: Card(
                                   color: Colors.green[50],
@@ -1141,7 +1206,7 @@ class _MainLayoutState extends State<MainLayout> {
                                               fontSize: 12),
                                         ),
                                         Text(
-                                          'Rp ${_formatCurrency(_totalPendapatan)}',
+                                          'Rp ${formatPrice(_totalPendapatan)}',
                                           style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold),
