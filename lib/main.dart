@@ -1031,19 +1031,11 @@ class _MainLayoutState extends State<MainLayout> {
                               int.tryParse(value) ?? DateTime.now().year;
                         });
                       },
-                      decoration: InputDecoration(
-                        labelText: 'Masukkan Tahun',
-                        border: OutlineInputBorder(),
-                      ),
+                      
                       keyboardType: TextInputType.number,
                     ),
                     SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: () {
-                        _ambilPenjualan(_selectedYear);
-                      },
-                      child: Text('Pilih Tahun'),
-                    ),
+                   
                     SizedBox(height: 10),
                     Container(
                       padding: EdgeInsets.all(24),
@@ -1139,7 +1131,7 @@ class _MainLayoutState extends State<MainLayout> {
                                     padding: EdgeInsets.all(16),
                                     child: Column(
                                       children: [
-                                        Icon(Icons.attach_money,
+                                        Icon(Icons.money,
                                             size: 32, color: Colors.green),
                                         SizedBox(height: 8),
                                         Text(
