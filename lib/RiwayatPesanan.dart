@@ -2,26 +2,18 @@ import 'package:appwrite/appwrite.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 
-final client = Client()
-  ..setEndpoint('https://fra.cloud.appwrite.io/v1')
-  ..setProject('681aa0b70002469fc157')
-  ..setSelfSigned(status: true);
-
 class RiwayatPesanan extends StatefulWidget {
   final String userId;
 
   RiwayatPesanan({required this.userId});
 
   @override
-  _RiwayatPesananState createState() =>
-      _RiwayatPesananState();
+  _RiwayatPesananState createState() => _RiwayatPesananState();
 }
 
-class _RiwayatPesananState
-    extends State<RiwayatPesanan> {
+class _RiwayatPesananState extends State<RiwayatPesanan> {
   late Client _client;
   late Databases _databases;
-  late Account _account;
 
   List<Map<String, dynamic>> _allOrders = [];
   bool _isLoading = true;
@@ -39,14 +31,12 @@ class _RiwayatPesananState
   }
 
   void _initAppwrite() {
-    _client = Client();
-    _client
-        .setEndpoint('https://fra.cloud.appwrite.io/v1')
-        .setProject(projectId)
-        .setSelfSigned(status: true);
+    _client = Client()
+      ..setEndpoint('https://fra.cloud.appwrite.io/v1')
+      ..setProject(projectId)
+      ..setSelfSigned(status: true);
 
     _databases = Databases(_client);
-    _account = Account(_client);
   }
 
   Future<void> _fetchOrders() async {
@@ -81,7 +71,7 @@ class _RiwayatPesananState
           'orderId': doc.$id,
           'originalOrderId': doc.data['orderId'],
           'produk': products,
-          'nama' : doc.data['nama'],
+          'nama': doc.data['nama'],
           'total': doc.data['total'] ?? 0,
           'metodePembayaran': doc.data['metodePembayaran'] ?? 'COD',
           'alamat': doc.data['alamat'] ?? 'No Address',
@@ -105,7 +95,6 @@ class _RiwayatPesananState
 
   Future<void> _updateOrderStatus(String orderId, String newStatus) async {
     try {
-      
       await _databases.updateDocument(
         databaseId: databaseId,
         collectionId: ordersCollectionId,
@@ -122,9 +111,10 @@ class _RiwayatPesananState
         }).toList();
       });
 
-      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Status pesanan telah diperbarui menjadi $newStatus')),
+        SnackBar(
+            content:
+                Text('Status pesanan telah diperbarui menjadi $newStatus')),
       );
     } catch (e) {
       print('Error updating order status: $e');
@@ -145,10 +135,6 @@ class _RiwayatPesananState
     } catch (e) {
       return dateString;
     }
-  }
-
-  String _formatOrderId(String orderId) {
-    return '#${orderId.substring(0, 10)}';
   }
 
   Widget _buildOrderCard(Map<String, dynamic> order) {
@@ -185,18 +171,19 @@ class _RiwayatPesananState
                   ),
                 ),
                 Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: status == 'Sedang Diantar' ? Colors.green[100] : Colors.orange[100],
+                    color: status == 'Sedang Diantar'
+                        ? Colors.green[100]
+                        : Colors.orange[100],
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     status,
                     style: TextStyle(
-                      color: status == 'Sedang Diantar' ? Colors.green[800] : Colors.orange[800],
+                      color: status == 'Sedang Diantar'
+                          ? Colors.green[800]
+                          : Colors.orange[800],
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -205,100 +192,20 @@ class _RiwayatPesananState
               ],
             ),
             SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.person,
-                  size: 16,
-                  color: Colors.grey[600],
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Nama: ${order['nama']}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            _buildInfoRow(Icons.person, 'Nama: ${order['nama']}'),
             SizedBox(height: 12),
-            // Alamat
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.location_on_outlined,
-                  size: 16,
-                  color: Colors.grey[600],
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Alamat: ${order['alamat']}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            _buildInfoRow(
+                Icons.location_on_outlined, 'Alamat: ${order['alamat']}'),
             SizedBox(height: 8),
-
-            // Produk
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.shopping_bag_outlined,
-                  size: 16,
-                  color: Colors.grey[600],
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Order:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      ...products
-                          .map((product) => Padding(
-                                padding: EdgeInsets.only(left: 8, top: 4),
-                                child: Text(
-                                  '• ${product['nama']} (${product['jumlah']}x)',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ))
-                          .toList(),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            _buildProductsList(products),
             SizedBox(height: 12),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
                     Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.blue[50],
                         borderRadius: BorderRadius.circular(6),
@@ -315,10 +222,7 @@ class _RiwayatPesananState
                     SizedBox(width: 8),
                     Text(
                       _formatDate(order['createdAt']),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[500],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                     ),
                   ],
                 ),
@@ -332,41 +236,91 @@ class _RiwayatPesananState
                 ),
               ],
             ),
-
-            
-            if (status == 'sedang diproses')
-              SizedBox(
-                height: 16,
-                child: ElevatedButton(
-                  onPressed: () => _updateOrderStatus(order['orderId'], 'Sedang Diantar'),
-                  child: Text('Sedang Diantar'),
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.white, backgroundColor: Colors.blue,
-                  ),
-                ),
-              ),
-            if (status == 'Sedang Diantar')
-              SizedBox(
-                height: 16,
-                child: ElevatedButton(
-                  onPressed: () => _updateOrderStatus(order['orderId'], 'Pesanan Telah Diterima'),
-                  child: Text('Pesanan Telah Diterima'),
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.white, backgroundColor: Colors.green,
-                  ),
-                ),
-              ),
+            _buildActionButtons(status, order['orderId']),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: Colors.grey[600]),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProductsList(List<dynamic> products) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.shopping_bag_outlined, size: 16, color: Colors.grey[600]),
+        SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Order:',
+                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+              ),
+              ...products.map((product) => Padding(
+                    padding: EdgeInsets.only(left: 8, top: 4),
+                    child: Text(
+                      '• ${product['nama']} (${product['jumlah']}x)',
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    ),
+                  )),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons(String status, String orderId) {
+    if (status == 'sedang diproses') {
+      return Padding(
+        padding: EdgeInsets.only(top: 16),
+        child: ElevatedButton(
+          onPressed: () => _updateOrderStatus(orderId, 'Sedang Diantar'),
+          child: Text('Sedang Diantar'),
+          style: ElevatedButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: Colors.blue,
+          ),
+        ),
+      );
+    } else if (status == 'Sedang Diantar') {
+      return Padding(
+        padding: EdgeInsets.only(top: 16),
+        child: ElevatedButton(
+          onPressed: () =>
+              _updateOrderStatus(orderId, 'Pesanan Telah Diterima'),
+          child: Text('Pesanan Telah Diterima'),
+          style: ElevatedButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: Colors.green,
+          ),
+        ),
+      );
+    }
+    return SizedBox.shrink();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      
       body: _isLoading
           ? Center(
               child: Column(

@@ -1,10 +1,8 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:appwrite/appwrite.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 class DataBarangScreen extends StatefulWidget {
@@ -15,20 +13,20 @@ class DataBarangScreen extends StatefulWidget {
 class _DataBarangScreenState extends State<DataBarangScreen> {
   late Client client;
   late Databases databases;
-  late Account account;
   late Storage _storage;
-  String userId = '';
-  String projectId = '681aa0b70002469fc157';
-  String databaseId = '681aa33a0023a8c7eb1f';
-  String productsCollectionId = '68407bab00235ecda20d';
+
+  final String projectId = '681aa0b70002469fc157';
+  final String databaseId = '681aa33a0023a8c7eb1f';
+  final String productsCollectionId = '68407bab00235ecda20d';
   final String bucketId = '681aa16f003054da8969';
+
   List<Map<String, dynamic>> products = [];
   List<Map<String, dynamic>> filteredProducts = [];
   File? _imageFile;
   String _productImageUrl = '';
   TextEditingController searchController = TextEditingController();
 
-  List<String> categories = [
+  final List<String> categories = [
     'All',
     'Market',
     'Minuman',
@@ -38,7 +36,7 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
     'Beauty'
   ];
 
-  List<String> categoriesForDialog = [
+  final List<String> categoriesForDialog = [
     'Market',
     'Minuman',
     'Bunsik',
@@ -47,33 +45,23 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
     'Beauty'
   ];
 
-  List<String> status = ['Aktif', 'Nonaktif'];
-
   String selectedCategory = 'All';
-  String selectedCategoryForDialog =
-      'Market'; // Perbaikan: gunakan kategori yang ada
-  String selectedStatus = 'Aktif';
+  String selectedCategoryForDialog = 'Market';
+  final String selectedStatus = 'Aktif';
 
-  // Formatter untuk format rupiah
   final NumberFormat currencyFormatter = NumberFormat('#,###', 'id_ID');
 
-  // Fungsi untuk format rupiah
   String formatRupiah(int amount) {
     return currencyFormatter.format(amount);
   }
 
-  // Fungsi untuk parse harga dari string (menghilangkan titik)
   int parsePrice(String priceText) {
-    try {
-      String cleanPrice =
-          priceText.replaceAll('.', '').replaceAll(',', '').trim();
-      if (cleanPrice.isEmpty) {
-        throw FormatException('Harga tidak boleh kosong');
-      }
-      return int.parse(cleanPrice);
-    } catch (e) {
-      throw FormatException('Format harga tidak valid');
+    String cleanPrice =
+        priceText.replaceAll('.', '').replaceAll(',', '').trim();
+    if (cleanPrice.isEmpty) {
+      throw FormatException('Harga tidak boleh kosong');
     }
+    return int.parse(cleanPrice);
   }
 
   @override
@@ -82,7 +70,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
     client = Client();
     client.setEndpoint('https://cloud.appwrite.io/v1').setProject(projectId);
     databases = Databases(client);
-    account = Account(client);
     _storage = Storage(client);
     _loadProductsData();
   }
@@ -90,7 +77,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
   Future<void> _addProduct(
       String name, String price, String category, String deskripsi) async {
     try {
-      // Validasi input
       if (name.trim().isEmpty) {
         _showErrorSnackBar('Nama produk tidak boleh kosong');
         return;
@@ -101,25 +87,17 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
         return;
       }
 
-      try {
-        final parsedPrice = parsePrice(price.trim());
-        if (parsedPrice < 0) {
-          _showErrorSnackBar('Masukkan harga yang valid (angka positif)');
-          return;
-        }
-      } catch (e) {
-        _showErrorSnackBar('Format harga tidak valid');
+      final parsedPrice = parsePrice(price.trim());
+      if (parsedPrice < 0) {
+        _showErrorSnackBar('Masukkan harga yang valid (angka positif)');
         return;
       }
-
-      final parsedPrice = parsePrice(price.trim());
 
       if (category.trim().isEmpty) {
         _showErrorSnackBar('Kategori tidak boleh kosong');
         return;
       }
 
-      // Data yang akan disimpan
       final productData = {
         'name': name.trim(),
         'price': parsedPrice,
@@ -129,30 +107,21 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
         'createdAt': DateTime.now().toIso8601String(),
       };
 
-      // Tambahkan URL gambar jika ada
       if (_productImageUrl.isNotEmpty) {
         productData['productImageUrl'] = _productImageUrl;
       }
 
-      print('Menambah produk dengan data: $productData'); // Debug log
-
-      final result = await databases.createDocument(
+      await databases.createDocument(
         databaseId: databaseId,
         collectionId: productsCollectionId,
-        documentId: ID.unique(), // Gunakan ID.unique() tanpa string
+        documentId: ID.unique(),
         data: productData,
       );
 
-      print('Produk berhasil ditambahkan: ${result.$id}'); // Debug log
-
-      // Reset state setelah berhasil
-      _imageFile = null;
-      _productImageUrl = '';
-
+      _resetImageState();
       await _loadProductsData();
       _showSuccessSnackBar('Produk berhasil ditambahkan!');
     } catch (e) {
-      print("Error adding product: $e");
       _showErrorSnackBar('Gagal menambahkan produk: ${e.toString()}');
     }
   }
@@ -160,7 +129,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
   Future<void> _editProduct(String productId, String name, String price,
       String category, String deskripsi, String currentImageUrl) async {
     try {
-      // Validasi input
       if (name.trim().isEmpty) {
         _showErrorSnackBar('Nama produk tidak boleh kosong');
         return;
@@ -171,25 +139,17 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
         return;
       }
 
-      try {
-        final parsedPrice = parsePrice(price.trim());
-        if (parsedPrice < 0) {
-          _showErrorSnackBar('Masukkan harga yang valid (angka positif)');
-          return;
-        }
-      } catch (e) {
-        _showErrorSnackBar('Format harga tidak valid');
+      final parsedPrice = parsePrice(price.trim());
+      if (parsedPrice < 0) {
+        _showErrorSnackBar('Masukkan harga yang valid (angka positif)');
         return;
       }
-
-      final parsedPrice = parsePrice(price.trim());
 
       if (productId.isEmpty) {
         _showErrorSnackBar('ID produk tidak valid');
         return;
       }
 
-      // Gunakan gambar baru jika ada, jika tidak gunakan gambar lama
       String finalImageUrl =
           _productImageUrl.isNotEmpty ? _productImageUrl : currentImageUrl;
 
@@ -204,9 +164,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
         updateData['productImageUrl'] = finalImageUrl;
       }
 
-      print(
-          'Mengupdate produk $productId dengan data: $updateData'); // Debug log
-
       await databases.updateDocument(
         databaseId: databaseId,
         collectionId: productsCollectionId,
@@ -214,14 +171,10 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
         data: updateData,
       );
 
-      // Reset state setelah berhasil
-      _imageFile = null;
-      _productImageUrl = '';
-
+      _resetImageState();
       await _loadProductsData();
       _showSuccessSnackBar('Produk berhasil diperbarui!');
     } catch (e) {
-      print("Error editing product: $e");
       _showErrorSnackBar('Gagal memperbarui produk: ${e.toString()}');
     }
   }
@@ -242,7 +195,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
       await _loadProductsData();
       _showSuccessSnackBar('Produk "$productName" berhasil dihapus!');
     } catch (e) {
-      print("Error deleting product: $e");
       _showErrorSnackBar('Gagal menghapus produk: ${e.toString()}');
     }
   }
@@ -284,9 +236,7 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                 'Batal',
                 style: TextStyle(color: Colors.grey[600]),
               ),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
               child: Text(
@@ -342,7 +292,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
         await _uploadImage();
       }
     } catch (e) {
-      print("Error picking image: $e");
       _showErrorSnackBar('Gagal memilih gambar: ${e.toString()}');
     }
   }
@@ -353,8 +302,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
     try {
       final fileId = 'product_${DateTime.now().millisecondsSinceEpoch}';
       final inputFile = InputFile.fromPath(path: _imageFile!.path);
-
-      print('Uploading image with fileId: $fileId'); // Debug log
 
       final result = await _storage.createFile(
         bucketId: bucketId,
@@ -368,24 +315,17 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
       setState(() {
         _productImageUrl = fileViewUrl;
       });
-
-      print('Image uploaded successfully: $_productImageUrl'); // Debug log
     } catch (e) {
-      print("Error uploading image: $e");
       _showErrorSnackBar('Gagal mengupload gambar: ${e.toString()}');
     }
   }
 
   Future<void> _loadProductsData() async {
     try {
-      print('Loading products data...'); // Debug log
-
       final response = await databases.listDocuments(
         databaseId: databaseId,
         collectionId: productsCollectionId,
       );
-
-      print('Loaded ${response.documents.length} products'); // Debug log
 
       setState(() {
         products = response.documents.map((doc) {
@@ -394,7 +334,7 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
             'price': (doc.data['price'] != null)
                 ? formatRupiah(doc.data['price'])
                 : '0',
-            'rawPrice': doc.data['price'] ?? 0, // Simpan harga asli untuk edit
+            'rawPrice': doc.data['price'] ?? 0,
             'category': doc.data['category'] ?? 'No category',
             'status': doc.data['status'] ?? 'Aktif',
             'productId': doc.$id,
@@ -406,7 +346,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
         filteredProducts = List.from(products);
       });
     } catch (e) {
-      print("Error loading products data: $e");
       _showErrorSnackBar('Gagal memuat data produk: ${e.toString()}');
     }
   }
@@ -434,6 +373,63 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
     });
   }
 
+  void _resetImageState() {
+    _imageFile = null;
+    _productImageUrl = '';
+  }
+
+  Widget _buildImageContainer(String imageUrl, double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: imageUrl.isNotEmpty
+            ? Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.grey.shade200,
+                    child: Icon(
+                      Icons.broken_image,
+                      color: Colors.grey,
+                      size: size * 0.5,
+                    ),
+                  );
+                },
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    color: Colors.grey.shade200,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                      ),
+                    ),
+                  );
+                },
+              )
+            : Container(
+                color: Colors.grey.shade200,
+                child: Icon(
+                  Icons.image,
+                  color: Colors.grey,
+                  size: size * 0.5,
+                ),
+              ),
+      ),
+    );
+  }
+
   Future<void> _showProductDialog({Map<String, dynamic>? product}) async {
     final TextEditingController nameController =
         TextEditingController(text: product?['productName'] ?? '');
@@ -442,14 +438,10 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
     final TextEditingController deskripsiController =
         TextEditingController(text: product?['deskripsi'] ?? '');
 
-    // Reset state gambar untuk dialog baru
-    _imageFile = null;
-    _productImageUrl = '';
+    _resetImageState();
 
-    // Simpan URL gambar saat ini untuk edit
     String currentImageUrl = product?['imageUrl'] ?? '';
 
-    // Set kategori untuk dialog
     if (product != null &&
         product['category'] != null &&
         categoriesForDialog.contains(product['category'])) {
@@ -552,8 +544,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                               ),
                             ),
                             SizedBox(height: 20),
-
-                            // Tampilkan gambar saat ini jika dalam mode edit
                             if (product != null &&
                                 currentImageUrl.isNotEmpty &&
                                 _imageFile == null)
@@ -567,37 +557,10 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                                     ),
                                   ),
                                   SizedBox(height: 8),
-                                  Container(
-                                    width: 100,
-                                    height: 100,
-                                    margin: EdgeInsets.symmetric(vertical: 10),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.grey),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        currentImageUrl,
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (context, error, stackTrace) {
-                                          return Container(
-                                            color: Colors.grey.shade200,
-                                            child: Icon(
-                                              Icons.broken_image,
-                                              color: Colors.grey,
-                                              size: 30,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
+                                  _buildImageContainer(currentImageUrl, 100),
                                   SizedBox(height: 16),
                                 ],
                               ),
-
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
@@ -617,8 +580,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                               ),
                             ),
                             SizedBox(height: 16),
-
-                            // Tampilkan preview gambar baru jika ada
                             if (_imageFile != null)
                               Column(
                                 children: [
@@ -633,7 +594,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                                   Container(
                                     width: 100,
                                     height: 100,
-                                    margin: EdgeInsets.symmetric(vertical: 10),
                                     decoration: BoxDecoration(
                                       border: Border.all(color: Colors.green),
                                       borderRadius: BorderRadius.circular(8),
@@ -648,7 +608,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                                   ),
                                 ],
                               ),
-
                             SizedBox(height: 16),
                             Text(
                               '* Field wajib diisi',
@@ -672,9 +631,7 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                             style: TextStyle(fontSize: 16),
                           ),
                           onPressed: () {
-                            // Reset state gambar saat cancel
-                            _imageFile = null;
-                            _productImageUrl = '';
+                            _resetImageState();
                             Navigator.of(context).pop();
                           },
                         ),
@@ -689,7 +646,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                                 horizontal: 15, vertical: 12),
                           ),
                           onPressed: () async {
-                            // Validasi input sebelum simpan
                             if (nameController.text.trim().isEmpty ||
                                 priceController.text.trim().isEmpty) {
                               _showErrorSnackBar(
@@ -697,7 +653,6 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                               return;
                             }
 
-                            // Validasi format harga
                             try {
                               parsePrice(priceController.text.trim());
                             } catch (e) {
@@ -802,74 +757,8 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
                               DataCell(
                                 Container(
                                   padding: EdgeInsets.all(4),
-                                  child: product['imageUrl'] != ''
-                                      ? Container(
-                                          width: 60,
-                                          height: 60,
-                                          decoration: BoxDecoration(
-                                            border: Border.all(
-                                                color: Colors.grey.shade300),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                          child: ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                            child: Image.network(
-                                              product['imageUrl'],
-                                              fit: BoxFit.cover,
-                                              errorBuilder:
-                                                  (context, error, stackTrace) {
-                                                return Container(
-                                                  color: Colors.grey.shade200,
-                                                  child: Icon(
-                                                    Icons.broken_image,
-                                                    color: Colors.grey,
-                                                    size: 30,
-                                                  ),
-                                                );
-                                              },
-                                              loadingBuilder: (context, child,
-                                                  loadingProgress) {
-                                                if (loadingProgress == null)
-                                                  return child;
-                                                return Container(
-                                                  color: Colors.grey.shade200,
-                                                  child: Center(
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      value: loadingProgress
-                                                                  .expectedTotalBytes !=
-                                                              null
-                                                          ? loadingProgress
-                                                                  .cumulativeBytesLoaded /
-                                                              loadingProgress
-                                                                  .expectedTotalBytes!
-                                                          : null,
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        )
-                                      : Container(
-                                          width: 60,
-                                          height: 60,
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey.shade200,
-                                            border: Border.all(
-                                                color: Colors.grey.shade300),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                          child: Icon(
-                                            Icons.image,
-                                            color: Colors.grey,
-                                            size: 30,
-                                          ),
-                                        ),
+                                  child: _buildImageContainer(
+                                      product['imageUrl'], 60),
                                 ),
                               ),
                               DataCell(

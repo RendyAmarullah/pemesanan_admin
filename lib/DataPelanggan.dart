@@ -10,27 +10,27 @@ class DataPelangganScreen extends StatefulWidget {
 class _DataPelangganScreenState extends State<DataPelangganScreen> {
   late Client client;
   late Databases databases;
-  late Account account;
-  String userId = '';
-  String projectId = '681aa0b70002469fc157';
-  String databaseId = '681aa33a0023a8c7eb1f';
-  String usersCollectionId = '684083800031dfaaecad';
+
+  final String projectId = '681aa0b70002469fc157';
+  final String databaseId = '681aa33a0023a8c7eb1f';
+  final String usersCollectionId = '684083800031dfaaecad';
   final String addressCollectionId = '68447d3d0007b5f75cc5';
+
   List<Map<String, dynamic>> customers = [];
   List<Map<String, dynamic>> filteredCustomers = [];
-
-  TextEditingController searchController = TextEditingController();
+  final TextEditingController searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _initializeAppwrite();
+    _loadPelangganData();
+  }
 
+  void _initializeAppwrite() {
     client = Client();
     client.setEndpoint('https://cloud.appwrite.io/v1').setProject(projectId);
     databases = Databases(client);
-    account = Account(client);
-
-    _loadPelangganData();
   }
 
   Future<void> _loadPelangganData() async {
@@ -38,9 +38,7 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
       final response = await databases.listDocuments(
         databaseId: databaseId,
         collectionId: usersCollectionId,
-        queries: [
-          Query.equal('roles', 'pelanggan'),
-        ],
+        queries: [Query.equal('roles', 'pelanggan')],
       );
 
       setState(() {
@@ -56,8 +54,9 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
         }).toList();
 
         filteredCustomers = List.from(customers);
-        _fetchCustomerAddresses();
       });
+
+      await _fetchCustomerAddresses();
     } catch (e) {
       print("Error loading pelanggan data: $e");
     }
@@ -69,9 +68,7 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
         final response = await databases.listDocuments(
           databaseId: databaseId,
           collectionId: addressCollectionId,
-          queries: [
-            Query.equal('user_id', customers[i]['userId']),
-          ],
+          queries: [Query.equal('user_id', customers[i]['userId'])],
         );
 
         if (response.documents.isNotEmpty) {
@@ -91,25 +88,15 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
   }
 
   void _filterData() {
+    final searchText = searchController.text.toLowerCase();
     setState(() {
-      filteredCustomers = customers
-          .where((customer) =>
-              customer['username']!
-                  .toLowerCase()
-                  .contains(searchController.text.toLowerCase()) ||
-              customer['email']!
-                  .toLowerCase()
-                  .contains(searchController.text.toLowerCase()) ||
-              customer['alamat']!
-                  .toLowerCase()
-                  .contains(searchController.text.toLowerCase()) ||
-              customer['noHandphone']!
-                  .toLowerCase()
-                  .contains(searchController.text.toLowerCase()) ||
-              customer['status']!
-                  .toLowerCase()
-                  .contains(searchController.text.toLowerCase()))
-          .toList();
+      filteredCustomers = customers.where((customer) {
+        return customer['username']!.toLowerCase().contains(searchText) ||
+            customer['email']!.toLowerCase().contains(searchText) ||
+            customer['alamat']!.toLowerCase().contains(searchText) ||
+            customer['noHandphone']!.toLowerCase().contains(searchText) ||
+            customer['status']!.toLowerCase().contains(searchText);
+      }).toList();
     });
   }
 
@@ -123,12 +110,12 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
       );
 
       setState(() {
-        filteredCustomers = filteredCustomers.map((customer) {
+        for (var customer in filteredCustomers) {
           if (customer['userId'] == userId) {
             customer['status'] = newStatus;
+            break;
           }
-          return customer;
-        }).toList();
+        }
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -140,6 +127,13 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
         SnackBar(content: Text('Gagal memperbarui status')),
       );
     }
+  }
+
+  Widget _buildStatusIcon(String status) {
+    return Icon(
+      status == 'Aktif' ? Icons.lock : Icons.lock_open,
+      color: status == 'Aktif' ? Colors.red : Colors.green,
+    );
   }
 
   @override
@@ -163,62 +157,46 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
             ),
             SizedBox(height: 20),
             Expanded(
-              child: SingleChildScrollView(
-                child: Container(
-                  padding: const EdgeInsets.all(4.0),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black, width: 1.0),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.vertical,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                          minWidth: MediaQuery.of(context).size.width),
-                      child: DataTable(
-                        columnSpacing: 30.0,
-                        columns: const [
-                          DataColumn(label: Text('Username')),
-                          DataColumn(label: Text('Email')),
-                          DataColumn(label: Text('Alamat')),
-                          DataColumn(label: Text('No. Handphone')),
-                          DataColumn(label: Text('Status')),
-                          DataColumn(label: Text('Actions')),
-                        ],
-                        rows: filteredCustomers.map((customer) {
-                          return DataRow(cells: [
-                            DataCell(Text(customer['username']!)),
-                            DataCell(Text(customer['email']!)),
-                            DataCell(Text(customer['alamat']!)),
-                            DataCell(Text(customer['noHandphone']!)),
-                            DataCell(Text(customer['status']!)),
-                            DataCell(
-                              Row(
-                                children: [
-                                  IconButton(
-                                    icon: Icon(
-                                      customer['status'] == 'Aktif'
-                                          ? Icons.lock
-                                          : Icons.lock_open,
-                                      color: customer['status'] == 'Aktif'
-                                          ? Colors.red
-                                          : Colors.green,
-                                    ),
-                                    onPressed: () {
-                                      String newStatus =
-                                          customer['status'] == 'Aktif'
-                                              ? 'Nonaktif'
-                                              : 'Aktif';
-                                      _updateStatus(
-                                          customer['userId'], newStatus);
-                                    },
-                                  ),
-                                ],
-                              ),
+              child: Container(
+                padding: const EdgeInsets.all(4.0),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.black, width: 1.0),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                        minWidth: MediaQuery.of(context).size.width),
+                    child: DataTable(
+                      columnSpacing: 30.0,
+                      columns: const [
+                        DataColumn(label: Text('Username')),
+                        DataColumn(label: Text('Email')),
+                        DataColumn(label: Text('Alamat')),
+                        DataColumn(label: Text('No. Handphone')),
+                        DataColumn(label: Text('Status')),
+                        DataColumn(label: Text('Actions')),
+                      ],
+                      rows: filteredCustomers.map((customer) {
+                        return DataRow(cells: [
+                          DataCell(Text(customer['username']!)),
+                          DataCell(Text(customer['email']!)),
+                          DataCell(Text(customer['alamat']!)),
+                          DataCell(Text(customer['noHandphone']!)),
+                          DataCell(Text(customer['status']!)),
+                          DataCell(
+                            IconButton(
+                              icon: _buildStatusIcon(customer['status']),
+                              onPressed: () {
+                                String newStatus = customer['status'] == 'Aktif'
+                                    ? 'Nonaktif'
+                                    : 'Aktif';
+                                _updateStatus(customer['userId'], newStatus);
+                              },
                             ),
-                          ]);
-                        }).toList(),
-                      ),
+                          ),
+                        ]);
+                      }).toList(),
                     ),
                   ),
                 ),
@@ -228,6 +206,12 @@ class _DataPelangganScreenState extends State<DataPelangganScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 }
 

@@ -332,13 +332,12 @@ class _MainLayoutState extends State<MainLayout> {
   Future<void> _ambilPendapatan(int tahun) async {
     setState(() {
       _isLoading = true;
-      _pendapatanPerBulan.clear(); // Clear previous data
+      _pendapatanPerBulan.clear();
     });
 
     try {
       double totalPendapatan = 0;
 
-      // Loop through each month
       for (int bulan = 1; bulan <= 12; bulan++) {
         final result = await _databases.listDocuments(
           databaseId: databaseId,
@@ -355,7 +354,6 @@ class _MainLayoutState extends State<MainLayout> {
         double pendapatanBulan = 0;
         for (var doc in result.documents) {
           double total = 0;
-          // Handle different data types for total field
           if (doc.data['total'] is int) {
             total = (doc.data['total'] as int).toDouble();
           } else if (doc.data['total'] is double) {
@@ -366,7 +364,6 @@ class _MainLayoutState extends State<MainLayout> {
           pendapatanBulan += total;
         }
 
-        // Store monthly revenue
         _pendapatanPerBulan[bulan] = pendapatanBulan;
         totalPendapatan += pendapatanBulan;
       }
@@ -563,12 +560,11 @@ class _MainLayoutState extends State<MainLayout> {
       return FlSpot(month.toDouble(), _pendapatanPerBulan[month] ?? 0);
     });
 
-    // Calculate maxY for better chart scaling
     double maxY = 0;
     if (_pendapatanPerBulan.values.isNotEmpty) {
       maxY = _pendapatanPerBulan.values.reduce((a, b) => a > b ? a : b);
     }
-    maxY = maxY * 1.2; // Add 20% padding
+    maxY = maxY * 1.2;
     if (maxY == 0) maxY = 100000;
 
     return LineChart(
@@ -653,7 +649,7 @@ class _MainLayoutState extends State<MainLayout> {
         lineBarsData: [
           LineChartBarData(
             spots: spots,
-            isCurved: false, // Diubah dari true ke false untuk garis lurus
+            isCurved: false,
             color: Colors.green,
             barWidth: 4,
             isStrokeCapRound: true,
@@ -772,13 +768,11 @@ class _MainLayoutState extends State<MainLayout> {
     return Scaffold(
       body: Row(
         children: [
-          // Sidebar
           Container(
             width: 280,
             color: Color(0xFF1976D2),
             child: Column(
               children: [
-                // Profile Section
                 Container(
                   padding: EdgeInsets.all(20),
                   child: Column(
@@ -845,7 +839,6 @@ class _MainLayoutState extends State<MainLayout> {
                     ],
                   ),
                 ),
-
                 Expanded(
                   child: Container(
                     padding: EdgeInsets.symmetric(vertical: 10),
@@ -895,7 +888,6 @@ class _MainLayoutState extends State<MainLayout> {
                     ),
                   ),
                 ),
-
                 Container(
                   padding: EdgeInsets.all(20),
                   child: SizedBox(
@@ -924,7 +916,6 @@ class _MainLayoutState extends State<MainLayout> {
               ],
             ),
           ),
-
           Expanded(
             child: Column(
               children: [
