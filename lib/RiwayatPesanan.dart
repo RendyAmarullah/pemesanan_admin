@@ -71,7 +71,7 @@ class _RiwayatPesananState extends State<RiwayatPesanan> {
           'orderId': doc.$id,
           'originalOrderId': doc.data['orderId'],
           'produk': products,
-          'nama': doc.data['name'],
+          'nama': doc.data['nama'],
           'total': doc.data['total'] ?? 0,
           'metodePembayaran': doc.data['metodePembayaran'] ?? 'COD',
           'alamat': doc.data['alamat'] ?? 'No Address',
@@ -192,7 +192,7 @@ class _RiwayatPesananState extends State<RiwayatPesanan> {
               ],
             ),
             SizedBox(height: 12),
-            _buildInfoRow(Icons.person, 'Nama: ${order['name']}'),
+            _buildInfoRow(Icons.person, 'Nama: ${order['nama']}'),
             SizedBox(height: 12),
             _buildInfoRow(
                 Icons.location_on_outlined, 'Alamat: ${order['alamat']}'),
