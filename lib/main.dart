@@ -390,6 +390,9 @@ class _MainLayoutState extends State<MainLayout> {
       final result = await _databases.listDocuments(
         databaseId: databaseId,
         collectionId: productKoleksiId,
+        queries: [
+        Query.limit(100), 
+      ],
       );
 
       setState(() {

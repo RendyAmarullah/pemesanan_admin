@@ -14,6 +14,8 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
   late Client client;
   late Databases databases;
   late Storage _storage;
+  int _offset = 0;
+  final int _limit = 100;
 
   final String projectId = '681aa0b70002469fc157';
   final String databaseId = '681aa33a0023a8c7eb1f';
@@ -325,6 +327,10 @@ class _DataBarangScreenState extends State<DataBarangScreen> {
       final response = await databases.listDocuments(
         databaseId: databaseId,
         collectionId: productsCollectionId,
+        queries: [
+        Query.limit(100),  // Limit the number of products fetched
+      ],
+
       );
 
       setState(() {
