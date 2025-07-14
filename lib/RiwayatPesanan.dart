@@ -273,13 +273,21 @@ class _RiwayatPesananState extends State<RiwayatPesanan> {
                 'Order:',
                 style: TextStyle(fontSize: 14, color: Colors.grey[700]),
               ),
-              ...products.map((product) => Padding(
-                    padding: EdgeInsets.only(left: 8, top: 4),
-                    child: Text(
-                      '• ${product['name']} (${product['jumlah']}x)',
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+              ...products.map((product) {
+       
+                bool isNonHalal = product['kategori'] == 'Non-halal';
+                
+                return Padding(
+                  padding: EdgeInsets.only(left: 8, top: 4),
+                  child: Text(
+                    '• ${product['name']} (${product['jumlah']}x)',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isNonHalal ? Colors.red : Colors.grey[600],
                     ),
-                  )),
+                  ),
+                );
+              }).toList(),
             ],
           ),
         ),

@@ -306,6 +306,7 @@ class _MainLayoutState extends State<MainLayout> {
           databaseId: databaseId,
           collectionId: '684b33e80033b767b024',
           queries: [
+            Query.equal('status', 'selesai'),
             Query.greaterThanEqual(
                 'tanggal', DateTime(tahun, bulan, 1).toIso8601String()),
             Query.lessThan(
