@@ -19,27 +19,28 @@ class _HomeScreenState extends State<HomeScreen> {
   late Databases _databases;
   bool _isLoading = true;
   int _totalCustomers = 0;
+  int _totalBarang = 0;
 
   static const String databaseId = '681aa33a0023a8c7eb1f';
   static const String usersCollectionId = 'users_collection_id';
+  static const String productsCollectionId = 'product_collection_id';
 
   @override
   void initState() {
     super.initState();
     _databases = Databases(client);
     _fetchCustomerCount();
+    _fetchTotalBarang();
   }
 
   Future<void> _fetchCustomerCount() async {
     setState(() => _isLoading = true);
-
     try {
       final result = await _databases.listDocuments(
         databaseId: databaseId,
         collectionId: usersCollectionId,
         queries: [Query.equal('role', 'pelanggan')],
       );
-
       setState(() {
         _totalCustomers = result.documents.length;
         _isLoading = false;
@@ -47,6 +48,20 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       print('Error fetching customer count: $e');
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchTotalBarang() async {
+    try {
+      final result = await _databases.listDocuments(
+        databaseId: databaseId,
+        collectionId: productsCollectionId,
+      );
+      setState(() {
+        _totalBarang = result.documents.length;
+      });
+    } catch (e) {
+      print('Error fetching total barang: $e');
     }
   }
 
@@ -83,179 +98,53 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildWelcomeCard(),
-          const SizedBox(height: 32),
-          _buildSectionTitle('Ringkasan'),
-          const SizedBox(height: 16),
           _buildStatsRow(),
-          const SizedBox(height: 32),
-          Expanded(child: _buildActivitySection()),
         ],
-      ),
-    );
-  }
-
-  Widget _buildWelcomeCard() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: _cardDecoration(),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1976D2).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.dashboard,
-              color: Color(0xFF1976D2),
-              size: 32,
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Selamat Datang di Dashboard!',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Kelola data pelanggan, barang, dan penjualan Anda dengan mudah',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        color: Colors.grey[800],
       ),
     );
   }
 
   Widget _buildStatsRow() {
     final stats = [
-      _StatData(
+      _buildStatsCard(
           'Total Pelanggan', '$_totalCustomers', Icons.people, Colors.blue),
-      _StatData('Total Barang', '89', Icons.inventory, Colors.green),
-      _StatData('Penjualan Hari Ini', '25', Icons.shopping_cart, Colors.orange),
-      _StatData('Total Revenue', 'Rp 2.5M', Icons.attach_money, Colors.purple),
+      _buildStatsCard(
+          'Total Barang', '$_totalBarang', Icons.inventory, Colors.green),
     ];
 
     return Row(
       children: stats
-          .map((stat) => Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: _buildStatsCard(stat),
-                ),
-              ))
+          .map((card) => Expanded(
+              child: Padding(
+                  padding: const EdgeInsets.only(right: 16), child: card)))
           .toList(),
     );
   }
 
-  Widget _buildStatsCard(_StatData stat) {
+  Widget _buildStatsCard(
+      String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: stat.color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              stat.icon,
-              color: stat.color,
-              size: 24,
-            ),
-          ),
+          _buildIconContainer(icon, color),
           const SizedBox(height: 16),
-          Text(
-            stat.value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
-            ),
-          ),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800])),
           const SizedBox(height: 4),
-          Text(
-            stat.title,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
+          Text(title, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
         ],
       ),
     );
   }
 
-  Widget _buildActivitySection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Aktivitas Terkini',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Expanded(child: _buildActivityList()),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActivityList() {
-    final activities = [
-      _ActivityData('Pelanggan baru "John dom" telah ditambahkan',
-          '2 menit yang lalu', Icons.person_add, Colors.green),
-      _ActivityData('Barang "Laptop ASUS" stok diperbarui',
-          '15 menit yang lalu', Icons.update, Colors.blue),
-      _ActivityData('Penjualan baru sebesar Rp 1.200.000', '1 jam yang lalu',
-          Icons.shopping_bag, Colors.orange),
-      _ActivityData('Laporan bulanan telah dibuat', '2 jam yang lalu',
-          Icons.report, Colors.purple),
-    ];
-
-    return ListView.builder(
-      itemCount: activities.length,
-      itemBuilder: (context, index) => _buildActivityItem(activities[index]),
-    );
-  }
-
-  Widget _buildActivityItem(_ActivityData activity) {
+  Widget _buildActivityItem(
+      String title, String time, IconData icon, Color color) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -266,44 +155,36 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: activity.color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              activity.icon,
-              color: activity.color,
-              size: 20,
-            ),
-          ),
+          _buildIconContainer(icon, color, size: 20),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  activity.title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey[800],
-                  ),
-                ),
+                Text(title,
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[800])),
                 const SizedBox(height: 4),
-                Text(
-                  activity.time,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
+                Text(time,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600])),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildIconContainer(IconData icon, Color color, {double size = 24}) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, color: color, size: size),
     );
   }
 
@@ -321,22 +202,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
   }
-}
-
-class _StatData {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  _StatData(this.title, this.value, this.icon, this.color);
-}
-
-class _ActivityData {
-  final String title;
-  final String time;
-  final IconData icon;
-  final Color color;
-
-  _ActivityData(this.title, this.time, this.icon, this.color);
 }
