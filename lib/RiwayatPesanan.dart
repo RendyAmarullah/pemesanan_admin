@@ -1,5 +1,8 @@
+import 'dart:io';
+import 'package:intl/intl.dart';
 import 'package:appwrite/appwrite.dart';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
 
 class RiwayatPesanan extends StatefulWidget {
@@ -22,6 +25,8 @@ class _RiwayatPesananState extends State<RiwayatPesanan> {
   final String projectId = '681aa0b70002469fc157';
   final String databaseId = '681aa33a0023a8c7eb1f';
   final String ordersCollectionId = '684b33e80033b767b024';
+  String _selectedFilter = 'Tahun';
+  DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
@@ -75,11 +80,14 @@ class _RiwayatPesananState extends State<RiwayatPesanan> {
           'total': doc.data['total'] ?? 0,
           'metodePembayaran': doc.data['metodePembayaran'] ?? 'COD',
           'alamat': doc.data['alamat'] ?? 'No Address',
-          'createdAt': doc.data['createdAt'] ?? '',
+          'createdAt': doc.data['tanggal'] ?? '',
           'status': doc.data['status'] ?? 'Menunggu',
         };
       }).toList();
 
+      if (_selectedFilter != 'Semua') {
+        orders = _filterOrders(orders);
+      }
       setState(() {
         _allOrders = orders;
         _isLoading = false;
@@ -136,6 +144,51 @@ class _RiwayatPesananState extends State<RiwayatPesanan> {
       return dateString;
     }
   }
+
+  List<Map<String, dynamic>> _filterOrders(List<Map<String, dynamic>> orders) {
+    DateTime startDate;
+    DateTime endDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 23, 59, 59);
+
+    if (_selectedFilter == 'Hari') {
+      startDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    } else if (_selectedFilter == 'Bulan') {
+      startDate = DateTime(_selectedDate.year, _selectedDate.month, 1);
+    } else if (_selectedFilter == 'Tahun') {
+      startDate = DateTime(_selectedDate.year, 1, 1);
+    } else {
+      return orders; // Jika filter tidak dikenali, return semua data
+    }
+
+    return orders.where((order) {
+      DateTime createdAt = DateTime.parse(order['createdAt']);
+      return createdAt.isAfter(startDate) && createdAt.isBefore(endDate);
+    }).toList();
+  }
+
+  Future<void> _downloadReport() async {
+    String csvData = "Order ID, Nama, Total, Metode Pembayaran, Tanggal, Status\n";
+
+    for (var order in _allOrders) {
+      csvData += "${order['originalOrderId']}, ${order['nama']}, ${order['total']}, ${order['metodePembayaran']}, ${order['createdAt']}, ${order['status']}\n";
+    }
+
+    // Memilih direktori menggunakan FilePicker
+    String? directoryPath = await FilePicker.platform.getDirectoryPath();
+
+    if (directoryPath != null) {
+      final file = File('$directoryPath/Laporan Penjualan.csv');
+      await file.writeAsString(csvData);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Laporan berhasil diunduh: ${file.path}')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Pemilihan direktori dibatalkan')),
+      );
+    }
+  }
+
 
   Widget _buildOrderCard(Map<String, dynamic> order) {
     List<dynamic> products = order['produk'];
@@ -243,6 +296,7 @@ class _RiwayatPesananState extends State<RiwayatPesanan> {
     );
   }
 
+  
   Widget _buildInfoRow(IconData icon, String text) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -329,6 +383,15 @@ class _RiwayatPesananState extends State<RiwayatPesanan> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: Text('Unduh Laporan'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.download),
+            onPressed: _downloadReport,
+          ),
+        ],
+      ),
       body: _isLoading
           ? Center(
               child: Column(
@@ -360,14 +423,90 @@ class _RiwayatPesananState extends State<RiwayatPesanan> {
                     ],
                   ),
                 )
-              : RefreshIndicator(
+                
+             : RefreshIndicator(
                   onRefresh: _fetchOrders,
-                  child: ListView.builder(
-                    padding: EdgeInsets.all(16),
-                    itemCount: _allOrders.length,
-                    itemBuilder: (context, index) {
-                      return _buildOrderCard(_allOrders[index]);
-                    },
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            DropdownButton<String>(
+                              value: _selectedFilter,
+                              items: ['Hari', 'Bulan', 'Tahun'].map((String filter) {
+                                return DropdownMenuItem<String>(
+                                  value: filter,
+                                  child: Text(filter),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedFilter = value!;
+                                });
+                                _fetchOrders();
+                              },
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                // Pilih tanggal untuk filter
+                                showDatePicker(
+                                  context: context,
+                                  initialDate: _selectedDate,
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2101),
+                                ).then((selectedDate) {
+                                  if (selectedDate != null) {
+                                    setState(() {
+                                      _selectedDate = selectedDate;
+                                    });
+                                    _fetchOrders();
+                                  }
+                                });
+                              },
+                              child: Text('Pilih Tanggal'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                         child: _allOrders.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.shopping_cart_outlined,
+                                  size: 64,
+                                  color: Colors.grey,
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  'Tidak ada penjualan',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          )
+                          : ListView.builder(
+                            padding: EdgeInsets.all(16),
+                            itemCount: _allOrders.length,
+                            itemBuilder: (context, index) {
+                              return _buildOrderCard(_allOrders[index]);
+                            },
+                          ),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: EdgeInsets.all(16),
+                          itemCount: _allOrders.length,
+                          itemBuilder: (context, index) {
+                            return _buildOrderCard(_allOrders[index]);
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
     );
