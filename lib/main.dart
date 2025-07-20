@@ -133,6 +133,9 @@ class _MainLayoutState extends State<MainLayout> {
   models.Session? _session;
   models.User? _currentUser;
   bool _showSalesChart = true;
+  DateTime _selectedDate = DateTime.now();
+  int _totalPenjualanHarian = 0;
+  double _totalPendapatanHarian = 0;
 
   final List<String> _monthNames = [
     'Jan',
@@ -167,13 +170,14 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    await Future.wait([
-      _ambilPenjualan(_selectedYear),
-      _ambilPendapatan(_selectedYear),
-    ]);
-    setState(() => _isLoading = false);
-  }
+  setState(() => _isLoading = true);
+  await Future.wait([
+    _ambilPenjualan(_selectedDate.year), // Tetap ambil data bulanan untuk chart
+    _ambilPendapatan(_selectedDate.year), // Tetap ambil data bulanan untuk chart
+    _ambilDataHarian(_selectedDate), // Ambil data spesifik untuk hari yang dipilih
+  ]);
+  setState(() => _isLoading = false);
+}
 
   @override
   void initState() {
@@ -182,8 +186,9 @@ class _MainLayoutState extends State<MainLayout> {
     _loadProfileData();
     _fetchCustomerCount();
     _ambilTotalBarang();
-    _ambilPenjualan(2025);
-    _ambilPendapatan(2025);
+    // _ambilPenjualan(2025);
+    // _ambilPendapatan(2025);
+    _loadData();
   }
 
   void _initializeAppwrite() {
@@ -198,6 +203,45 @@ class _MainLayoutState extends State<MainLayout> {
     _databases = Databases(_client);
   }
 
+  Future<void> _ambilDataHarian(DateTime tanggal) async {
+  // Tentukan awal dan akhir hari
+  final awalHari = DateTime(tanggal.year, tanggal.month, tanggal.day);
+  final akhirHari = DateTime(tanggal.year, tanggal.month, tanggal.day + 1);
+
+  try {
+    final result = await _databases.listDocuments(
+      databaseId: databaseId,
+      collectionId: '684b33e80033b767b024', // ID Koleksi Penjualan Anda
+      queries: [
+        Query.equal('status', 'selesai'),
+        Query.greaterThanEqual('tanggal', awalHari.toIso8601String()),
+        Query.lessThan('tanggal', akhirHari.toIso8601String()),
+      ],
+    );
+
+    double pendapatanHarian = 0;
+    for (var doc in result.documents) {
+      double total = 0;
+      if (doc.data['total'] is int) {
+        total = (doc.data['total'] as int).toDouble();
+      } else if (doc.data['total'] is double) {
+        total = doc.data['total'] as double;
+      } else if (doc.data['total'] is String) {
+        total = double.tryParse(doc.data['total'] as String) ?? 0.0;
+      }
+      pendapatanHarian += total;
+    }
+
+    if (mounted) {
+      setState(() {
+        _totalPenjualanHarian = result.documents.length;
+        _totalPendapatanHarian = pendapatanHarian;
+      });
+    }
+  } catch (e) {
+    print('Error fetching data harian: $e');
+  }
+}
   Future<void> _loadProfileData() async {
     if (!mounted) return;
 
@@ -293,7 +337,25 @@ class _MainLayoutState extends State<MainLayout> {
       }
     }
   }
-
+  Future<void> _selectDate(BuildContext context) async {
+  final DateTime? picked = await showDatePicker(
+    context: context,
+    initialDate: _selectedDate,
+    firstDate: DateTime(2020),
+    lastDate: DateTime(2101),
+  );
+  if (picked != null && picked != _selectedDate) {
+    setState(() {
+      _selectedDate = picked;
+      // Jika tahun berubah, kita juga perlu memuat ulang data chart
+      if (_selectedYear != picked.year) {
+        _selectedYear = picked.year;
+      }
+    });
+    // Muat ulang semua data dashboard berdasarkan tanggal baru
+    _loadData();
+  }
+}
   Future<void> _ambilPenjualan(int tahun) async {
     setState(() {
       _isLoading = true;
@@ -1028,63 +1090,113 @@ class _MainLayoutState extends State<MainLayout> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatsCard(
-                            title: 'Total Pelanggan',
-                            value: '$_totalCustomers',
-                            icon: Icons.people,
-                            color: Color(0xFF0072BC),
-                          ),
-                        ),
-                        Expanded(
-                          child: _buildStatsCard(
-                            title: 'Total Barang',
-                            value: '$_totalBarang',
-                            icon: Icons.inventory,
-                            color: Colors.green,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(
-                      height: 14,
-                    ),
                     Card(
-                      margin: EdgeInsets.only(bottom: 16),
+                      margin: EdgeInsets.only(bottom: 24),
                       child: Padding(
-                        padding: EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(8.0),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Tahun: $_selectedYear',
-                              style: TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.w500),
-                            ),
-                            Row(
+                            'Data untuk Tanggal:',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w500),
+                          ),
+                            TextButton(
+                              onPressed: () => _selectDate(context),
+                            child: Row(
                               children: [
-                                IconButton(
-                                  icon: Icon(Icons.chevron_left),
-                                  onPressed: () {
-                                    setState(() => _selectedYear--);
-                                    _loadData();
-                                  },
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.chevron_right),
-                                  onPressed: () {
-                                    setState(() => _selectedYear++);
-                                    _loadData();
-                                  },
-                                ),
+                                Icon(Icons.calendar_today, size: 18),
+                                SizedBox(width: 8),
+                                Text(
+                                  "${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}",
+                                  style: TextStyle(
+                                      fontSize: 16, fontWeight: FontWeight.bold),
+                                      ),
                               ],
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ),
+                    SizedBox(
+                      height: 14,
+                    ),
+                    Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatsCard(
+                          title: 'Penjualan Hari Ini',
+                          value: '$_totalPenjualanHarian',
+                          icon: Icons.point_of_sale,
+                          color: Colors.orange,
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildStatsCard(
+                          title: 'Pendapatan Hari Ini',
+                          value: 'Rp ${formatPrice(_totalPendapatanHarian)}',
+                          icon: Icons.monetization_on,
+                          color: Colors.teal,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 14),
+                    // Card(
+                    //   margin: EdgeInsets.only(bottom: 16),
+                    //   child: Padding(
+                    //     padding: EdgeInsets.all(16),
+                    //     child: Row(
+                    //       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    //       children: [
+                    //         Text(
+                    //           'Tahun: $_selectedYear',
+                    //           style: TextStyle(
+                    //               fontSize: 16, fontWeight: FontWeight.w500),
+                    //         ),
+                    //         Row(
+                    //           children: [
+                    //             IconButton(
+                    //               icon: Icon(Icons.chevron_left),
+                    //               onPressed: () {
+                    //                 setState(() => _selectedYear--);
+                    //                 _loadData();
+                    //               },
+                    //             ),
+                    //             IconButton(
+                    //               icon: Icon(Icons.chevron_right),
+                    //               onPressed: () {
+                    //                 setState(() => _selectedYear++);
+                    //                 _loadData();
+                    //               },
+                    //             ),
+                    //           ],
+                    //         ),
+                    //       ],
+                    //     ),
+                    //   ),
+                    // ),
+                     Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatsCard(
+                          title: 'Total Pelanggan',
+                          value: '$_totalCustomers',
+                          icon: Icons.people,
+                          color: Color(0xFF0072BC),
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildStatsCard(
+                          title: 'Total Barang',
+                          value: '$_totalBarang',
+                          icon: Icons.inventory,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
                     SizedBox(height: 5),
                     TextField(
                       onChanged: (value) {
